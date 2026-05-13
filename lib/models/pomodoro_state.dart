@@ -1,5 +1,18 @@
 enum TimerPhase { focus, shortBreak, longBreak }
 
+enum TimerAppearance { ring, dots, kernel, numerals }
+
+extension TimerAppearanceX on TimerAppearance {
+  String get label {
+    switch (this) {
+      case TimerAppearance.ring: return 'Ring';
+      case TimerAppearance.dots: return 'Dots';
+      case TimerAppearance.kernel: return 'Kernel';
+      case TimerAppearance.numerals: return 'Numerals';
+    }
+  }
+}
+
 enum TimerStatus { idle, running, paused, complete }
 
 extension TimerPhaseX on TimerPhase {

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../controllers/settings_controller.dart';
 import '../../core/theme/app_tokens.dart';
+import '../../models/pomodoro_state.dart';
 import '../../services/window_service.dart';
 import '../../widgets/common/chip_selector.dart';
 import '../../widgets/common/pop_toggle.dart';
@@ -165,6 +166,8 @@ class _SettingsBody extends StatelessWidget {
           t: t,
           children: [
             _ThemeRow(t: t, settings: settings),
+            Divider(color: t.border, height: 28),
+            _TimerStyleRow(t: t, settings: settings),
           ],
         ),
         const SizedBox(height: 8),
@@ -317,6 +320,45 @@ class _WindowRow extends StatelessWidget {
           Icon(Icons.picture_in_picture_alt_rounded, size: 18, color: t.ink3),
         ],
       ),
+    );
+  }
+}
+
+// ── Timer style row ───────────────────────────────────────────────────────────
+
+class _TimerStyleRow extends StatelessWidget {
+  const _TimerStyleRow({required this.t, required this.settings});
+
+  final AppTokens t;
+  final SettingsController settings;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Timer style',
+          style: TextStyle(
+            fontFamily: AppFonts.ui,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: t.ink,
+          ),
+        ),
+        const SizedBox(height: 10),
+        ChipSelector<TimerAppearance>(
+          options: TimerAppearance.values,
+          selected: settings.timerAppearance,
+          onSelect: (v) => settings.timerAppearance = v,
+          labelBuilder: (v) => v.label,
+          inkColor: t.ink,
+          bgColor: t.bg,
+          surfaceColor: t.surface2,
+          borderColor: t.border,
+          ink2Color: t.ink2,
+        ),
+      ],
     );
   }
 }

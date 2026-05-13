@@ -7,7 +7,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
-import '../lib/widgets/mascot/pop_mascot.dart';
+import 'package:popodoro/widgets/mascot/pop_mascot.dart';
 
 void main() {
   runApp(const _IconGeneratorApp());

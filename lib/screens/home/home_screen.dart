@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_typography.dart';
 
+import '../../controllers/settings_controller.dart';
 import '../../controllers/timer_controller.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../models/pomodoro_state.dart';
@@ -10,7 +11,7 @@ import '../../services/sound_service.dart';
 import '../../services/window_service.dart';
 import '../../widgets/mascot/pop_mascot.dart';
 import '../../widgets/mascot/pop_wordmark.dart';
-import '../../widgets/timer/timer_ring.dart';
+import '../../widgets/timer/timer_display.dart';
 import '../../widgets/common/pop_button.dart';
 import '../../widgets/common/nudge_card.dart';
 import '../../widgets/sheets/task_input_sheet.dart';
@@ -213,7 +214,7 @@ class _TimerCenter extends StatelessWidget {
   final TimerController timer;
   final AppTokens t;
 
-  Color get _ringColor {
+  Color get _accentColor {
     switch (timer.phase) {
       case TimerPhase.focus: return t.pop;
       case TimerPhase.shortBreak: return t.sage;
@@ -223,21 +224,36 @@ class _TimerCenter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final appearance = context.read<SettingsController>().timerAppearance;
     return LayoutBuilder(builder: (context, c) {
       final size = (c.maxWidth * 0.78).clamp(200.0, 320.0);
       return Center(
-        child: TimerRing(
-          progress: timer.progress,
-          timeDisplay: timer.timeDisplay,
-          sessionLabel: timer.sessionDisplay,
-          taskName: timer.taskName.isNotEmpty ? timer.taskName : null,
-          ringColor: _ringColor,
-          trackColor: t.surface2,
-          inkColor: t.ink,
-          ink2Color: t.ink2,
-          ink3Color: t.ink3,
-          size: size,
-          strokeWidth: size * 0.045,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 280),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
+          child: KeyedSubtree(
+            key: ValueKey(appearance),
+            child: TimerDisplay(
+              appearance: appearance,
+              progress: timer.progress,
+              timeDisplay: timer.timeDisplay,
+              sessionLabel: timer.sessionDisplay,
+              taskName: timer.taskName.isNotEmpty ? timer.taskName : null,
+              ringColor: _accentColor,
+              trackColor: t.surface2,
+              inkColor: t.ink,
+              ink2Color: t.ink2,
+              ink3Color: t.ink3,
+              surfaceColor: t.surface,
+              borderColor: t.border,
+              bumpColor: t.bump,
+              bumpEdgeColor: t.bumpEdge,
+              size: size,
+              strokeWidth: size * 0.045,
+            ),
+          ),
         ),
       );
     });

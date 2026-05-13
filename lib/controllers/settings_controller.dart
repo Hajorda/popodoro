@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/pomodoro_state.dart';
+
 // All user-configurable settings. Persisted to SharedPreferences immediately
 // on every change so there's no explicit "save" step.
 class SettingsController extends ChangeNotifier {
@@ -14,6 +16,7 @@ class SettingsController extends ChangeNotifier {
     required bool autoStartBreaks,
     required bool autoStartFocus,
     required ThemeMode themeMode,
+    required TimerAppearance timerAppearance,
   })  : _prefs = prefs,
         _focusMinutes = focusMinutes,
         _shortBreakMinutes = shortBreakMinutes,
@@ -22,7 +25,8 @@ class SettingsController extends ChangeNotifier {
         _soundEnabled = soundEnabled,
         _autoStartBreaks = autoStartBreaks,
         _autoStartFocus = autoStartFocus,
-        _themeMode = themeMode;
+        _themeMode = themeMode,
+        _timerAppearance = timerAppearance;
 
   // Load from disk. Call once before runApp.
   static Future<SettingsController> load() async {
@@ -37,6 +41,7 @@ class SettingsController extends ChangeNotifier {
       autoStartBreaks: prefs.getBool(_kAutoBreak) ?? false,
       autoStartFocus: prefs.getBool(_kAutoFocus) ?? false,
       themeMode: ThemeMode.values[prefs.getInt(_kTheme) ?? 0],
+      timerAppearance: TimerAppearance.values[prefs.getInt(_kTimerAppearance) ?? 0],
     );
   }
 
@@ -49,6 +54,7 @@ class SettingsController extends ChangeNotifier {
   static const _kAutoBreak = 'autoStartBreaks';
   static const _kAutoFocus = 'autoStartFocus';
   static const _kTheme = 'themeMode';
+  static const _kTimerAppearance = 'timerAppearance';
 
   final SharedPreferences _prefs;
 
@@ -61,6 +67,7 @@ class SettingsController extends ChangeNotifier {
   bool _autoStartBreaks;
   bool _autoStartFocus;
   ThemeMode _themeMode;
+  TimerAppearance _timerAppearance;
 
   // ── Getters ──────────────────────────────────────────────────────────────────
   SharedPreferences get prefs => _prefs;
@@ -72,6 +79,7 @@ class SettingsController extends ChangeNotifier {
   bool get autoStartBreaks => _autoStartBreaks;
   bool get autoStartFocus => _autoStartFocus;
   ThemeMode get themeMode => _themeMode;
+  TimerAppearance get timerAppearance => _timerAppearance;
 
   // Valid option sets used by the UI
   static const focusOptions = [15, 25, 50, 90];
@@ -133,6 +141,13 @@ class SettingsController extends ChangeNotifier {
     if (_themeMode == v) return;
     _themeMode = v;
     _prefs.setInt(_kTheme, v.index);
+    notifyListeners();
+  }
+
+  set timerAppearance(TimerAppearance v) {
+    if (_timerAppearance == v) return;
+    _timerAppearance = v;
+    _prefs.setInt(_kTimerAppearance, v.index);
     notifyListeners();
   }
 }
