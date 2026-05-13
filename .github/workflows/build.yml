@@ -72,9 +72,13 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      # The pre-installed Inno Setup on windows-latest is missing some language
+      # files (e.g. Icelandic.isl). Reinstall via Chocolatey to get the full pack.
+      - name: Install Inno Setup (full language pack)
+        run: choco install innosetup --force -y
+
       # inno_bundle drives flutter build windows internally, then wraps the
       # output into a self-contained Inno Setup installer (.exe).
-      # Inno Setup is pre-installed on windows-latest runners.
       - name: Build Windows installer
         run: dart run inno_bundle --release
 

@@ -106,9 +106,6 @@ inno_bundle:
     description: "A focused Pomodoro timer"
     publisher: "Popodoro"
     url: "https://github.com/hajorda/popodoro"
-  installer:
-    languages:
-      - English
 
 # ── App icon configuration (flutter_launcher_icons) ───────────────────────────
 flutter_launcher_icons:
