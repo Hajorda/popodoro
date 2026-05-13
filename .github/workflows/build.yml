@@ -1,0 +1,117 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── macOS ─────────────────────────────────────────────────────────────────────
+  build-macos:
+    name: Build macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # Disable code signing so the build works on CI without Apple certificates.
+      # The resulting .app is unsigned — it can be run locally after right-clicking
+      # "Open" to bypass Gatekeeper. For notarized/App Store builds, see the
+      # "Signed distribution" section in README.
+      - name: Disable code signing for CI
+        run: |
+          /usr/libexec/PlistBuddy \
+            -c "Set :com.apple.security.app-sandbox false" \
+            macos/Runner/Release.entitlements
+          ruby -e "
+            f = 'macos/Runner.xcodeproj/project.pbxproj'
+            c = File.read(f)
+            c.gsub!(/CODE_SIGN_STYLE = Automatic;/, 'CODE_SIGN_STYLE = Manual;')
+            c.gsub!(/DEVELOPMENT_TEAM = \S+;/, 'DEVELOPMENT_TEAM = ;')
+            File.write(f, c)
+          "
+
+      - name: Build macOS (release)
+        run: flutter build macos --release
+
+      - name: Zip .app bundle
+        run: |
+          cd build/macos/Build/Products/Release
+          zip -r "$GITHUB_WORKSPACE/popodoro-macos.zip" popodoro.app
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: popodoro-macos
+          path: popodoro-macos.zip
+          retention-days: 14
+
+  # ── Windows ───────────────────────────────────────────────────────────────────
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Windows (release)
+        run: flutter build windows --release
+
+      - name: Zip release folder
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path build/windows/x64/runner/Release/* `
+            -DestinationPath popodoro-windows.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: popodoro-windows
+          path: popodoro-windows.zip
+          retention-days: 14
+
+  # ── GitHub Release (tag pushes only) ─────────────────────────────────────────
+  release:
+    name: Create GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: popodoro-macos
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: popodoro-windows
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            popodoro-macos.zip
+            popodoro-windows.zip
+          generate_release_notes: true
