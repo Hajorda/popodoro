@@ -72,10 +72,27 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # The pre-installed Inno Setup on windows-latest is missing some language
-      # files (e.g. Icelandic.isl). Reinstall via Chocolatey to get the full pack.
-      - name: Install Inno Setup (full language pack)
-        run: choco install innosetup --force -y
+      # inno_bundle references unofficial Inno Setup language files (e.g. Icelandic)
+      # that are not included in the pre-installed copy on windows-latest runners.
+      # Download them directly from the Inno Setup source repo.
+      - name: Download missing Inno Setup language files
+        shell: pwsh
+        run: |
+          $unofficialLangs = @(
+            "Basque", "Belarusian", "Croatian", "Esperanto",
+            "Galician", "Georgian", "Icelandic", "Macedonian",
+            "Malay", "Maltese", "Punjabi", "Tamil", "Urdu", "Vietnamese"
+          )
+          $base = "https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/Unofficial"
+          $dest = "C:\Program Files (x86)\Inno Setup 6\Languages"
+          foreach ($lang in $unofficialLangs) {
+            try {
+              Invoke-WebRequest -Uri "$base/$lang.isl" -OutFile "$dest\$lang.isl" -ErrorAction Stop
+              Write-Host "✓ $lang.isl"
+            } catch {
+              Write-Host "⚠ $lang.isl not found upstream (skipping)"
+            }
+          }
 
       # inno_bundle drives flutter build windows internally, then wraps the
       # output into a self-contained Inno Setup installer (.exe).
