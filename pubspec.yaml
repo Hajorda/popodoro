@@ -1,5 +1,5 @@
 name: popodoro
-description: "A new Flutter project."
+description: "Popodoro — a focused Pomodoro timer for macOS and Windows."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -44,6 +44,7 @@ dev_dependencies:
 
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.3
+  inno_bundle: ^0.11.2
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -97,6 +98,17 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# ── Windows installer configuration (inno_bundle) ────────────────────────────
+inno_bundle:
+  app:
+    name: "Popodoro"
+    description: "A focused Pomodoro timer"
+    publisher: "Popodoro"
+    url: "https://github.com/hajorda/popodoro"
+  installer:
+    languages:
+      - English
 
 # ── App icon configuration (flutter_launcher_icons) ───────────────────────────
 flutter_launcher_icons:
