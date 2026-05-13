@@ -77,6 +77,28 @@ class HistoryController extends ChangeNotifier {
     });
   }
 
+  // 7×24 intensity grid (0–3) derived from sessions in the last 30 days.
+  // Row index = weekday - 1 (0=Mon … 6=Sun), column = hour 0–23.
+  List<List<int>> get heatmap {
+    final cutoff = DateTime.now().subtract(const Duration(days: 30));
+    final recent = _sessions.where((s) => s.startTime.isAfter(cutoff));
+    final counts = List.generate(7, (_) => List.filled(24, 0));
+    for (final s in recent) {
+      final day = s.startTime.weekday - 1;
+      final h = s.startTime.hour;
+      counts[day][h]++;
+    }
+    final maxCount = counts.fold<int>(
+      0, (m, row) => row.fold(m, (m2, v) => v > m2 ? v : m2));
+    if (maxCount == 0) return counts;
+    return counts.map((row) => row.map((v) {
+      if (v == 0) return 0;
+      if (v * 3 <= maxCount) return 1;
+      if (v * 3 <= maxCount * 2) return 2;
+      return 3;
+    }).toList()).toList();
+  }
+
   // Top peak hours sorted by total focused minutes (last 30 days).
   List<PeakHour> get peakHours {
     final cutoff = DateTime.now().subtract(const Duration(days: 30));

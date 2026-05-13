@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_typography.dart';
 import 'package:provider/provider.dart';
 
+import '../../controllers/history_controller.dart';
 import '../../controllers/settings_controller.dart';
 import '../../core/theme/app_tokens.dart';
+import '../../core/theme/app_typography.dart';
 import '../../models/pomodoro_state.dart';
 import '../../services/window_service.dart';
-import '../../widgets/common/chip_selector.dart';
-import '../../widgets/common/pop_toggle.dart';
+import 'appearance_screen.dart';
+import 'nudges_screen.dart';
+import 'timer_settings_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -18,8 +20,9 @@ class SettingsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: t.bg,
       appBar: _SettingsAppBar(t: t),
-      body: Consumer<SettingsController>(
-        builder: (context, settings, _) => _SettingsBody(t: t, settings: settings),
+      body: Consumer2<SettingsController, HistoryController>(
+        builder: (context, settings, history, _) =>
+            _SettingsBody(t: t, settings: settings, history: history),
       ),
     );
   }
@@ -29,7 +32,6 @@ class SettingsScreen extends StatelessWidget {
 
 class _SettingsAppBar extends StatelessWidget implements PreferredSizeWidget {
   const _SettingsAppBar({required this.t});
-
   final AppTokens t;
 
   @override
@@ -57,11 +59,7 @@ class _SettingsAppBar extends StatelessWidget implements PreferredSizeWidget {
       ),
       title: Text(
         'Settings',
-        style: TextStyle(fontFamily: AppFonts.ui, 
-          fontSize: 17,
-          fontWeight: FontWeight.w600,
-          color: t.ink,
-        ),
+        style: TextStyle(fontFamily: AppFonts.ui, fontSize: 17, fontWeight: FontWeight.w600, color: t.ink),
       ),
       centerTitle: true,
     );
@@ -71,154 +69,116 @@ class _SettingsAppBar extends StatelessWidget implements PreferredSizeWidget {
 // ── Body ──────────────────────────────────────────────────────────────────────
 
 class _SettingsBody extends StatelessWidget {
-  const _SettingsBody({required this.t, required this.settings});
-
+  const _SettingsBody({required this.t, required this.settings, required this.history});
   final AppTokens t;
   final SettingsController settings;
+  final HistoryController history;
 
   @override
   Widget build(BuildContext context) {
+    final streak = history.streakDays;
+    final totalSessions = history.allSessions.length;
+    final totalMins = history.totalFocusedMinutesAllTime;
+
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
       children: [
-        _Section(
-          title: 'Durations',
-          t: t,
-          children: [
-            _DurationRow(
-              label: 'Focus',
-              value: settings.focusMinutes,
-              options: SettingsController.focusOptions,
-              onSelect: (v) => settings.focusMinutes = v,
-              t: t,
-            ),
-            const SizedBox(height: 20),
-            _DurationRow(
-              label: 'Short break',
-              value: settings.shortBreakMinutes,
-              options: SettingsController.shortBreakOptions,
-              onSelect: (v) => settings.shortBreakMinutes = v,
-              t: t,
-            ),
-            const SizedBox(height: 20),
-            _DurationRow(
-              label: 'Long break',
-              value: settings.longBreakMinutes,
-              options: SettingsController.longBreakOptions,
-              onSelect: (v) => settings.longBreakMinutes = v,
-              t: t,
-            ),
-            const SizedBox(height: 20),
-            _DurationRow(
-              label: 'Sessions before long break',
-              value: settings.sessionsBeforeLongBreak,
-              options: SettingsController.sessionOptions,
-              onSelect: (v) => settings.sessionsBeforeLongBreak = v,
-              t: t,
-            ),
-          ],
-        ),
+        // Quick stats strip
+        const SizedBox(height: 12),
+        _StatsStrip(t: t, streak: streak, sessions: totalSessions, totalMins: totalMins),
         const SizedBox(height: 8),
-        _Section(
-          title: 'Behaviour',
+
+        // Focus group
+        _GroupLabel(t: t, label: 'Focus'),
+        _SetGroup(
           t: t,
           children: [
-            PopToggle(
-              label: 'Auto-start breaks',
-              subtitle: 'Break begins automatically when focus ends',
-              value: settings.autoStartBreaks,
-              onChanged: (v) => settings.autoStartBreaks = v,
-              activeColor: t.pop,
-              surface2Color: t.surface2,
-              borderColor: t.border,
-              inkColor: t.ink,
-              ink2Color: t.ink2,
+            _NavRow(
+              t: t,
+              icon: '◐',
+              iconBg: t.pop,
+              label: 'Timer & rhythm',
+              value: '${settings.focusMinutes} · ${settings.shortBreakMinutes} · ${settings.longBreakMinutes}',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const TimerSettingsScreen()),
+              ),
             ),
-            Divider(color: t.border, height: 28),
-            PopToggle(
-              label: 'Auto-start focus',
-              subtitle: 'Focus session begins automatically after a break',
-              value: settings.autoStartFocus,
-              onChanged: (v) => settings.autoStartFocus = v,
-              activeColor: t.pop,
-              surface2Color: t.surface2,
-              borderColor: t.border,
-              inkColor: t.ink,
-              ink2Color: t.ink2,
+            _Separator(t: t),
+            _NavRow(
+              t: t,
+              icon: '◍',
+              iconBg: t.surface2,
+              label: "Pop's nudges",
+              value: 'on · golden hrs',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const NudgesScreen()),
+              ),
             ),
-            Divider(color: t.border, height: 28),
-            PopToggle(
-              label: 'Sound',
-              subtitle: 'Chime on session complete, click on button tap',
-              value: settings.soundEnabled,
-              onChanged: (v) => settings.soundEnabled = v,
-              activeColor: t.pop,
-              surface2Color: t.surface2,
-              borderColor: t.border,
-              inkColor: t.ink,
-              ink2Color: t.ink2,
+            _Separator(t: t),
+            _NavRow(
+              t: t,
+              icon: '♪',
+              iconBg: t.surface2,
+              label: 'Sounds',
+              value: settings.soundEnabled ? 'on' : 'off',
+              isLast: true,
+              onTap: () {},
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        _Section(
-          title: 'Appearance',
+
+        // Look & feel
+        _GroupLabel(t: t, label: 'Look & feel'),
+        _SetGroup(
           t: t,
           children: [
-            _ThemeRow(t: t, settings: settings),
-            Divider(color: t.border, height: 28),
-            _TimerStyleRow(t: t, settings: settings),
+            _NavRow(
+              t: t,
+              icon: '●',
+              iconBg: t.ink,
+              label: 'Appearance',
+              value: '${settings.themeMode.name[0].toUpperCase()}${settings.themeMode.name.substring(1)} · ${settings.timerAppearance.label}',
+              isLast: true,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const AppearanceScreen()),
+              ),
+            ),
           ],
         ),
-        const SizedBox(height: 8),
-        _Section(
-          title: 'Window',
+
+        // Window
+        _GroupLabel(t: t, label: 'Window'),
+        _SetGroup(
           t: t,
           children: [
-            _WindowRow(t: t),
+            _ActionRow(
+              t: t,
+              icon: Icons.picture_in_picture_alt_rounded,
+              label: 'Mini mode',
+              subtitle: 'Float as a compact pill overlay',
+              isLast: true,
+              onTap: () {
+                Navigator.of(context).pop();
+                context.read<WindowService>().enterMiniMode();
+              },
+            ),
           ],
         ),
-        const SizedBox(height: 32),
-      ],
-    );
-  }
-}
 
-// ── Section wrapper ───────────────────────────────────────────────────────────
+        // Account
+        _GroupLabel(t: t, label: 'Account', foot: 'Popodoro is offline-first. Your data never leaves your device.'),
+        _SetGroup(
+          t: t,
+          children: [
+            _NavRow(t: t, icon: '↗', iconBg: t.surface2, label: 'Export data', isLast: true, onTap: () {}),
+          ],
+        ),
 
-class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.t, required this.children});
-
-  final String title;
-  final AppTokens t;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 20, bottom: 12),
+        const SizedBox(height: 24),
+        Center(
           child: Text(
-            title.toUpperCase(),
-            style: TextStyle(fontFamily: AppFonts.mono, 
-              fontSize: 10,
-              color: t.ink3,
-              letterSpacing: 0.14,
-            ),
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: t.surface,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: t.border),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: children,
+            'POPODORO · v1.0.0',
+            style: TextStyle(fontFamily: AppFonts.mono, fontSize: 10, color: t.ink3, letterSpacing: 0.1),
           ),
         ),
       ],
@@ -226,177 +186,198 @@ class _Section extends StatelessWidget {
   }
 }
 
-// ── Duration row ──────────────────────────────────────────────────────────────
+// ── Stats strip ───────────────────────────────────────────────────────────────
 
-class _DurationRow extends StatelessWidget {
-  const _DurationRow({
-    required this.label,
-    required this.value,
-    required this.options,
-    required this.onSelect,
-    required this.t,
-  });
-
-  final String label;
-  final int value;
-  final List<int> options;
-  final void Function(int) onSelect;
+class _StatsStrip extends StatelessWidget {
+  const _StatsStrip({required this.t, required this.streak, required this.sessions, required this.totalMins});
   final AppTokens t;
+  final int streak;
+  final int sessions;
+  final int totalMins;
 
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(fontFamily: AppFonts.ui, 
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: t.ink,
-          ),
-        ),
-        const SizedBox(height: 10),
-        ChipSelector<int>(
-          options: options,
-          selected: value,
-          onSelect: onSelect,
-          labelBuilder: (v) => '$v min',
-          inkColor: t.ink,
-          bgColor: t.bg,
-          surfaceColor: t.surface2,
-          borderColor: t.border,
-          ink2Color: t.ink2,
-        ),
-      ],
-    );
+  String _fmtMins(int m) {
+    if (m < 60) return '${m}m';
+    return '${m ~/ 60}h';
   }
-}
-
-// ── Window row ────────────────────────────────────────────────────────────────
-
-class _WindowRow extends StatelessWidget {
-  const _WindowRow({required this.t});
-
-  final AppTokens t;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(context).pop();
-        context.read<WindowService>().enterMiniMode();
-      },
-      behavior: HitTestBehavior.opaque,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: t.dim,
+        borderRadius: BorderRadius.circular(14),
+      ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Mini mode',
-                  style: TextStyle(
-                    fontFamily: AppFonts.ui,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: t.ink,
-                    height: 1.3,
-                  ),
-                ),
-                Text(
-                  'Float as a compact pill overlay',
-                  style: TextStyle(
-                    fontFamily: AppFonts.ui,
-                    fontSize: 12,
-                    color: t.ink2,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Icon(Icons.picture_in_picture_alt_rounded, size: 18, color: t.ink3),
+          _MiniStat(t: t, value: streak > 0 ? '🔥 $streak' : '—', label: 'streak'),
+          Container(width: 1, height: 28, color: t.border),
+          _MiniStat(t: t, value: sessions.toString(), label: 'popped'),
+          Container(width: 1, height: 28, color: t.border),
+          _MiniStat(t: t, value: _fmtMins(totalMins), label: 'focused'),
         ],
       ),
     );
   }
 }
 
-// ── Timer style row ───────────────────────────────────────────────────────────
-
-class _TimerStyleRow extends StatelessWidget {
-  const _TimerStyleRow({required this.t, required this.settings});
-
+class _MiniStat extends StatelessWidget {
+  const _MiniStat({required this.t, required this.value, required this.label});
   final AppTokens t;
-  final SettingsController settings;
+  final String value;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Timer style',
-          style: TextStyle(
-            fontFamily: AppFonts.ui,
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: t.ink,
-          ),
-        ),
-        const SizedBox(height: 10),
-        ChipSelector<TimerAppearance>(
-          options: TimerAppearance.values,
-          selected: settings.timerAppearance,
-          onSelect: (v) => settings.timerAppearance = v,
-          labelBuilder: (v) => v.label,
-          inkColor: t.ink,
-          bgColor: t.bg,
-          surfaceColor: t.surface2,
-          borderColor: t.border,
-          ink2Color: t.ink2,
-        ),
+        Text(value, style: TextStyle(fontFamily: AppFonts.display, fontSize: 20, color: t.ink, height: 1.0)),
+        const SizedBox(height: 3),
+        Text(label, style: TextStyle(fontFamily: AppFonts.mono, fontSize: 9, color: t.ink3, letterSpacing: 0.1)),
       ],
     );
   }
 }
 
-// ── Theme row ─────────────────────────────────────────────────────────────────
+// ── Group primitives ──────────────────────────────────────────────────────────
 
-class _ThemeRow extends StatelessWidget {
-  const _ThemeRow({required this.t, required this.settings});
-
+class _GroupLabel extends StatelessWidget {
+  const _GroupLabel({required this.t, required this.label, this.foot});
   final AppTokens t;
-  final SettingsController settings;
+  final String label;
+  final String? foot;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Theme',
-          style: TextStyle(fontFamily: AppFonts.ui, 
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: t.ink,
-          ),
+    return Padding(
+      padding: const EdgeInsets.only(top: 22, bottom: 10, left: 4),
+      child: Text(
+        label.toUpperCase(),
+        style: TextStyle(fontFamily: AppFonts.mono, fontSize: 10, color: t.ink3, letterSpacing: 0.14),
+      ),
+    );
+  }
+}
+
+class _SetGroup extends StatelessWidget {
+  const _SetGroup({required this.t, required this.children});
+  final AppTokens t;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: t.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: t.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(children: children),
+    );
+  }
+}
+
+class _Separator extends StatelessWidget {
+  const _Separator({required this.t});
+  final AppTokens t;
+  @override
+  Widget build(BuildContext context) => Divider(color: t.border, height: 1, indent: 56);
+}
+
+// ── Row types ─────────────────────────────────────────────────────────────────
+
+class _NavRow extends StatelessWidget {
+  const _NavRow({
+    required this.t,
+    required this.icon,
+    required this.iconBg,
+    required this.label,
+    this.value,
+    this.isLast = false,
+    required this.onTap,
+  });
+  final AppTokens t;
+  final String icon;
+  final Color iconBg;
+  final String label;
+  final String? value;
+  final bool isLast;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        child: Row(
+          children: [
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(8)),
+              child: Center(
+                child: Text(icon, style: TextStyle(fontSize: 14, color: iconBg == t.ink ? t.bg : t.ink)),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(label, style: TextStyle(fontFamily: AppFonts.ui, fontSize: 14, fontWeight: FontWeight.w500, color: t.ink)),
+            ),
+            if (value != null) ...[
+              Text(value!, style: TextStyle(fontFamily: AppFonts.mono, fontSize: 12, color: t.ink2)),
+              const SizedBox(width: 6),
+            ],
+            Icon(Icons.chevron_right_rounded, size: 18, color: t.ink3),
+          ],
         ),
-        const SizedBox(height: 10),
-        ChipSelector<ThemeMode>(
-          options: ThemeMode.values,
-          selected: settings.themeMode,
-          onSelect: (v) => settings.themeMode = v,
-          labelBuilder: (v) => v.name[0].toUpperCase() + v.name.substring(1),
-          inkColor: t.ink,
-          bgColor: t.bg,
-          surfaceColor: t.surface2,
-          borderColor: t.border,
-          ink2Color: t.ink2,
+      ),
+    );
+  }
+}
+
+class _ActionRow extends StatelessWidget {
+  const _ActionRow({
+    required this.t,
+    required this.icon,
+    required this.label,
+    this.subtitle,
+    this.isLast = false,
+    required this.onTap,
+  });
+  final AppTokens t;
+  final IconData icon;
+  final String label;
+  final String? subtitle;
+  final bool isLast;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: TextStyle(fontFamily: AppFonts.ui, fontSize: 14, fontWeight: FontWeight.w500, color: t.ink)),
+                  if (subtitle != null)
+                    Text(subtitle!, style: TextStyle(fontFamily: AppFonts.ui, fontSize: 12, color: t.ink2, height: 1.4)),
+                ],
+              ),
+            ),
+            Icon(icon, size: 18, color: t.ink3),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
