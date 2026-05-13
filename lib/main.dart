@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'controllers/history_controller.dart';
 import 'controllers/settings_controller.dart';
 import 'controllers/timer_controller.dart';
 import 'core/theme/app_theme.dart';
@@ -28,19 +29,22 @@ void main() async {
   });
 
   final settings = await SettingsController.load();
-  runApp(PopodoroApp(settings: settings));
+  final history = HistoryController(prefs: settings.prefs);
+  runApp(PopodoroApp(settings: settings, history: history));
 }
 
 class PopodoroApp extends StatelessWidget {
-  const PopodoroApp({super.key, required this.settings});
+  const PopodoroApp({super.key, required this.settings, required this.history});
 
   final SettingsController settings;
+  final HistoryController history;
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: settings),
+        ChangeNotifierProvider.value(value: history),
         ChangeNotifierProvider<WindowService>(
           create: (ctx) => WindowService(prefs: ctx.read<SettingsController>().prefs),
         ),
@@ -52,6 +56,7 @@ class PopodoroApp extends StatelessWidget {
           create: (ctx) => TimerController(
             settings: ctx.read<SettingsController>(),
             onFocusComplete: ctx.read<SoundService>().playConfirmation,
+            onSessionComplete: ctx.read<HistoryController>().record,
           ),
           update: (_, s, previous) => previous!,
         ),

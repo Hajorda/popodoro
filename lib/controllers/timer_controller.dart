@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/pomodoro_state.dart';
+import '../models/session_record.dart';
 import 'settings_controller.dart';
 
 class TimerController extends ChangeNotifier {
-  TimerController({required this.settings, this.onFocusComplete}) {
+  TimerController({required this.settings, this.onFocusComplete, this.onSessionComplete}) {
     settings.addListener(_onSettingsChanged);
   }
 
@@ -13,6 +14,9 @@ class TimerController extends ChangeNotifier {
   // Fire-and-forget callback when a focus session ends (plays completion sound).
   final Future<void> Function()? onFocusComplete;
 
+  // Called with the completed SessionRecord when a focus session ends naturally.
+  final void Function(SessionRecord)? onSessionComplete;
+
   TimerPhase _phase = TimerPhase.focus;
   TimerStatus _status = TimerStatus.idle;
   int _secondsRemaining = -1;
@@ -20,6 +24,7 @@ class TimerController extends ChangeNotifier {
   int _currentSession = 1;
   String _taskName = '';
   Timer? _ticker;
+  DateTime? _sessionStartTime;
 
   // Set true when all N sessions in a cycle finish — holds state so the
   // SessionCompleteScreen can be shown before transitioning to long break.
@@ -70,6 +75,9 @@ class TimerController extends ChangeNotifier {
   void start() {
     if (_status == TimerStatus.running) return;
     if (_secondsRemaining < 0) _secondsRemaining = totalSecondsForPhase;
+    if (_phase == TimerPhase.focus && _sessionStartTime == null) {
+      _sessionStartTime = DateTime.now();
+    }
     _status = TimerStatus.running;
     _ticker = Timer.periodic(const Duration(seconds: 1), _tick);
     notifyListeners();
@@ -151,6 +159,17 @@ class TimerController extends ChangeNotifier {
       final isCycleComplete =
           _completedSessions % settings.sessionsBeforeLongBreak == 0;
       _phase = isCycleComplete ? TimerPhase.longBreak : TimerPhase.shortBreak;
+
+      if (onSessionComplete != null && _sessionStartTime != null) {
+        final durationMinutes = settings.focusMinutes;
+        onSessionComplete!(SessionRecord(
+          id: _sessionStartTime!.millisecondsSinceEpoch.toString(),
+          startTime: _sessionStartTime!,
+          durationMinutes: durationMinutes,
+          taskName: _taskName.isNotEmpty ? _taskName : null,
+        ));
+      }
+      _sessionStartTime = null;
       _taskName = '';
       onFocusComplete?.call();
 
@@ -165,6 +184,7 @@ class TimerController extends ChangeNotifier {
       }
     } else {
       _phase = TimerPhase.focus;
+      _sessionStartTime = null;
     }
 
     _secondsRemaining = totalSecondsForPhase;

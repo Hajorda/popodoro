@@ -7,6 +7,7 @@ import '../../controllers/timer_controller.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../models/pomodoro_state.dart';
 import '../../screens/settings/settings_screen.dart';
+import '../../screens/today/today_screen.dart';
 import '../../services/sound_service.dart';
 import '../../services/window_service.dart';
 import '../../widgets/mascot/pop_mascot.dart';
@@ -96,6 +97,22 @@ class _TopBar extends StatelessWidget {
           PopWordmark(fontSize: 24, color: t.ink, accentColor: t.pop),
           Row(
             children: [
+              GestureDetector(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(builder: (_) => const TodayScreen()),
+                ),
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: t.surface,
+                    border: Border.all(color: t.border),
+                  ),
+                  child: Icon(Icons.today_rounded, size: 16, color: t.ink2),
+                ),
+              ),
+              const SizedBox(width: 8),
               GestureDetector(
                 onTap: () => context.read<WindowService>().enterMiniMode(),
                 child: Container(
