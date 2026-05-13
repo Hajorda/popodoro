@@ -103,7 +103,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: popodoro-windows
-          path: build/windows/x64/installer/popodoro-*-windows-installer.exe
+          path: build/windows/x64/installer/Release/popodoro-*-windows-installer.exe
           retention-days: 14
 
   # ── GitHub Release (tag pushes only) ─────────────────────────────────────────
