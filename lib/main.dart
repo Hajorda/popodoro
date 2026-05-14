@@ -97,13 +97,15 @@ class PopodoroApp extends StatelessWidget {
           ),
           update: (_, s, previous) => previous!,
         ),
-        ProxyProvider2<SettingsController, TimerController, DesktopTrayService>(
+        ProxyProvider3<SettingsController, TimerController, TogetherService,
+            DesktopTrayService>(
           lazy: false,
           create: (_) => DesktopTrayService(),
-          update: (_, settings, timer, previous) =>
+          update: (_, settings, timer, together, previous) =>
               (previous ?? DesktopTrayService()).bind(
                 settings: settings,
                 timer: timer,
+                together: together,
               ),
           dispose: (_, service) => service.dispose(),
         ),

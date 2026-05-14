@@ -7,10 +7,12 @@ import 'package:window_manager/window_manager.dart';
 
 import '../controllers/settings_controller.dart';
 import '../controllers/timer_controller.dart';
+import 'together_service.dart';
 
 class DesktopTrayService with WindowListener, TrayListener {
   SettingsController? _settings;
   TimerController? _timer;
+  TogetherService? _together;
   Menu? _menu;
 
   bool _windowListenerAttached = false;
@@ -25,6 +27,7 @@ class DesktopTrayService with WindowListener, TrayListener {
   DesktopTrayService bind({
     required SettingsController settings,
     required TimerController timer,
+    required TogetherService together,
   }) {
     if (!_supportedPlatform) return this;
 
@@ -38,6 +41,12 @@ class DesktopTrayService with WindowListener, TrayListener {
       _timer?.removeListener(_onTimerChanged);
       _timer = timer;
       timer.addListener(_onTimerChanged);
+    }
+
+    if (!identical(_together, together)) {
+      _together?.removeListener(_onTogetherChanged);
+      _together = together;
+      together.addListener(_onTogetherChanged);
     }
 
     _scheduleTrayUpdate();
@@ -106,17 +115,28 @@ class DesktopTrayService with WindowListener, TrayListener {
     }
 
     await _ensureTrayInitialized();
-    await trayManager.setToolTip(_toolTipText(mode, timer));
+
+    // Prefer co-focus timer when actively in a together session.
+    final together = _together;
+    final room = together?.room;
+    final inCoFocus = together != null &&
+        together.isInRoom &&
+        room != null &&
+        (room.isFocusing || room.isOnBreak);
+
+    final timeLabel = inCoFocus ? room.timeDisplay : timer.timeDisplay;
+
+    await trayManager.setToolTip(_toolTipText(mode, timeLabel));
     if (Platform.isMacOS) {
       await trayManager.setTitle(
-        mode == DesktopTrayMode.timer ? timer.timeDisplay : '',
+        mode == DesktopTrayMode.timer ? timeLabel : '',
       );
     }
   }
 
-  String _toolTipText(DesktopTrayMode mode, TimerController timer) {
+  String _toolTipText(DesktopTrayMode mode, String timeLabel) {
     if (mode == DesktopTrayMode.timer) {
-      return 'Popodoro · ${timer.timeDisplay}';
+      return 'Popodoro · $timeLabel';
     }
     return 'Popodoro';
   }
@@ -152,6 +172,7 @@ class DesktopTrayService with WindowListener, TrayListener {
 
   void _onSettingsChanged() => _scheduleTrayUpdate();
   void _onTimerChanged() => _scheduleTrayUpdate();
+  void _onTogetherChanged() => _scheduleTrayUpdate();
 
   @override
   Future<void> onWindowClose() async {
@@ -211,6 +232,7 @@ class DesktopTrayService with WindowListener, TrayListener {
   void dispose() {
     _settings?.removeListener(_onSettingsChanged);
     _timer?.removeListener(_onTimerChanged);
+    _together?.removeListener(_onTogetherChanged);
     if (_windowListenerAttached) {
       windowManager.removeListener(this);
       _windowListenerAttached = false;

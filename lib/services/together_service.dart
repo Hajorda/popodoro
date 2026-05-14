@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -162,6 +163,7 @@ class TogetherService extends ChangeNotifier {
   List<TogetherParticipant> _participants = [];
   List<TogetherReaction> _recentReactions = [];
   RealtimeChannel? _channel;
+  Timer? _ticker;
 
   bool _loading = false;
   String? _error;
@@ -266,6 +268,9 @@ class TogetherService extends ChangeNotifier {
         .from('room_participants')
         .update({'status': 'focusing'})
         .eq('room_id', _room!.id);
+    // Realtime will echo the change, but start ticking immediately so the host
+    // sees the timer decrement without waiting for the round-trip.
+    _updateTicker();
   }
 
   /// Host → transitions room from active → break.
@@ -275,6 +280,16 @@ class TogetherService extends ChangeNotifier {
     await _client
         .from('rooms')
         .update({'status': 'break', 'break_started_at': now})
+        .eq('id', _room!.id);
+  }
+
+  /// Host → adds [minutes] to the focus duration (live extension).
+  Future<void> addMinutes(int minutes) async {
+    if (_room == null || !isHost) return;
+    final newDuration = _room!.durationMinutes + minutes;
+    await _client
+        .from('rooms')
+        .update({'duration_minutes': newDuration})
         .eq('id', _room!.id);
   }
 
@@ -303,6 +318,8 @@ class TogetherService extends ChangeNotifier {
   }
 
   Future<void> leaveRoom() async {
+    _ticker?.cancel();
+    _ticker = null;
     _unsubscribe();
     if (_room != null && myUserId != null) {
       try {
@@ -372,6 +389,7 @@ class TogetherService extends ChangeNotifier {
     final data = payload.newRecord;
     if (data.isNotEmpty && _room != null) {
       _room = TogetherRoom.fromMap(data);
+      _updateTicker();
       notifyListeners();
     }
   }
@@ -386,6 +404,16 @@ class TogetherService extends ChangeNotifier {
       final reaction = TogetherReaction.fromMap(data);
       _recentReactions = [reaction, ..._recentReactions.take(9)];
       notifyListeners();
+    }
+  }
+
+  void _updateTicker() {
+    final needsTick = _room != null && (_room!.isFocusing || _room!.isOnBreak);
+    if (needsTick && _ticker == null) {
+      _ticker = Timer.periodic(const Duration(seconds: 1), (_) => notifyListeners());
+    } else if (!needsTick) {
+      _ticker?.cancel();
+      _ticker = null;
     }
   }
 
@@ -422,6 +450,7 @@ class TogetherService extends ChangeNotifier {
 
   @override
   void dispose() {
+    _ticker?.cancel();
     _unsubscribe();
     super.dispose();
   }
