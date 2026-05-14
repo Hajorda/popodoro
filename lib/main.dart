@@ -7,6 +7,7 @@ import 'controllers/settings_controller.dart';
 import 'controllers/timer_controller.dart';
 import 'core/theme/app_theme.dart';
 import 'screens/shell.dart';
+import 'services/desktop_tray_service.dart';
 import 'services/sound_service.dart';
 import 'services/window_service.dart';
 
@@ -46,7 +47,8 @@ class PopodoroApp extends StatelessWidget {
         ChangeNotifierProvider.value(value: settings),
         ChangeNotifierProvider.value(value: history),
         ChangeNotifierProvider<WindowService>(
-          create: (ctx) => WindowService(prefs: ctx.read<SettingsController>().prefs),
+          create: (ctx) =>
+              WindowService(prefs: ctx.read<SettingsController>().prefs),
         ),
         Provider<SoundService>(
           create: (ctx) => SoundService(ctx.read<SettingsController>()),
@@ -59,6 +61,15 @@ class PopodoroApp extends StatelessWidget {
             onSessionComplete: ctx.read<HistoryController>().record,
           ),
           update: (_, s, previous) => previous!,
+        ),
+        ProxyProvider2<SettingsController, TimerController, DesktopTrayService>(
+          create: (_) => DesktopTrayService(),
+          update: (_, settings, timer, previous) =>
+              (previous ?? DesktopTrayService()).bind(
+                settings: settings,
+                timer: timer,
+              ),
+          dispose: (_, service) => service.dispose(),
         ),
       ],
       child: Consumer<SettingsController>(

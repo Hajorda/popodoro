@@ -37,6 +37,7 @@ dependencies:
   shared_preferences: ^2.3.3
   audioplayers: ^6.1.0
   window_manager: ^0.4.3
+  tray_manager: ^0.5.2
 
 dev_dependencies:
   flutter_test:
@@ -59,6 +60,7 @@ flutter:
 
   assets:
     - assets/sounds/
+    - assets/icon/icon.png
 
   fonts:
     - family: InstrumentSerif

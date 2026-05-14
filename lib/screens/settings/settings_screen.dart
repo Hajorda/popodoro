@@ -8,6 +8,7 @@ import '../../core/theme/app_typography.dart';
 import '../../models/pomodoro_state.dart';
 import '../../services/window_service.dart';
 import 'appearance_screen.dart';
+import 'desktop_tray_settings_screen.dart';
 import 'nudges_screen.dart';
 import 'timer_settings_screen.dart';
 
@@ -53,13 +54,22 @@ class _SettingsAppBar extends StatelessWidget implements PreferredSizeWidget {
               color: t.surface,
               border: Border.all(color: t.border),
             ),
-            child: Icon(Icons.arrow_back_ios_new_rounded, size: 14, color: t.ink),
+            child: Icon(
+              Icons.arrow_back_ios_new_rounded,
+              size: 14,
+              color: t.ink,
+            ),
           ),
         ),
       ),
       title: Text(
         'Settings',
-        style: TextStyle(fontFamily: AppFonts.ui, fontSize: 17, fontWeight: FontWeight.w600, color: t.ink),
+        style: TextStyle(
+          fontFamily: AppFonts.ui,
+          fontSize: 17,
+          fontWeight: FontWeight.w600,
+          color: t.ink,
+        ),
       ),
       centerTitle: true,
     );
@@ -69,7 +79,11 @@ class _SettingsAppBar extends StatelessWidget implements PreferredSizeWidget {
 // ── Body ──────────────────────────────────────────────────────────────────────
 
 class _SettingsBody extends StatelessWidget {
-  const _SettingsBody({required this.t, required this.settings, required this.history});
+  const _SettingsBody({
+    required this.t,
+    required this.settings,
+    required this.history,
+  });
   final AppTokens t;
   final SettingsController settings;
   final HistoryController history;
@@ -85,7 +99,12 @@ class _SettingsBody extends StatelessWidget {
       children: [
         // Quick stats strip
         const SizedBox(height: 12),
-        _StatsStrip(t: t, streak: streak, sessions: totalSessions, totalMins: totalMins),
+        _StatsStrip(
+          t: t,
+          streak: streak,
+          sessions: totalSessions,
+          totalMins: totalMins,
+        ),
         const SizedBox(height: 8),
 
         // Focus group
@@ -98,9 +117,12 @@ class _SettingsBody extends StatelessWidget {
               icon: '◐',
               iconBg: t.pop,
               label: 'Timer & rhythm',
-              value: '${settings.focusMinutes} · ${settings.shortBreakMinutes} · ${settings.longBreakMinutes}',
+              value:
+                  '${settings.focusMinutes} · ${settings.shortBreakMinutes} · ${settings.longBreakMinutes}',
               onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (_) => const TimerSettingsScreen()),
+                MaterialPageRoute<void>(
+                  builder: (_) => const TimerSettingsScreen(),
+                ),
               ),
             ),
             _Separator(t: t),
@@ -137,10 +159,13 @@ class _SettingsBody extends StatelessWidget {
               icon: '●',
               iconBg: t.ink,
               label: 'Appearance',
-              value: '${settings.themeMode.name[0].toUpperCase()}${settings.themeMode.name.substring(1)} · ${settings.timerAppearance.label}',
+              value:
+                  '${settings.themeMode.name[0].toUpperCase()}${settings.themeMode.name.substring(1)} · ${settings.timerAppearance.label}',
               isLast: true,
               onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (_) => const AppearanceScreen()),
+                MaterialPageRoute<void>(
+                  builder: (_) => const AppearanceScreen(),
+                ),
               ),
             ),
           ],
@@ -156,21 +181,47 @@ class _SettingsBody extends StatelessWidget {
               icon: Icons.picture_in_picture_alt_rounded,
               label: 'Mini mode',
               subtitle: 'Float as a compact pill overlay',
-              isLast: true,
+              isLast: false,
               onTap: () {
                 Navigator.of(context).pop();
                 context.read<WindowService>().enterMiniMode();
               },
             ),
+            _Separator(t: t),
+            _NavRow(
+              t: t,
+              icon: '◉',
+              iconBg: t.surface2,
+              label: 'System tray',
+              value: settings.desktopTrayMode.label,
+              isLast: true,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const DesktopTraySettingsScreen(),
+                ),
+              ),
+            ),
           ],
         ),
 
         // Account
-        _GroupLabel(t: t, label: 'Account', foot: 'Popodoro is offline-first. Your data never leaves your device.'),
+        _GroupLabel(
+          t: t,
+          label: 'Account',
+          foot:
+              'Popodoro is offline-first. Your data never leaves your device.',
+        ),
         _SetGroup(
           t: t,
           children: [
-            _NavRow(t: t, icon: '↗', iconBg: t.surface2, label: 'Export data', isLast: true, onTap: () {}),
+            _NavRow(
+              t: t,
+              icon: '↗',
+              iconBg: t.surface2,
+              label: 'Export data',
+              isLast: true,
+              onTap: () {},
+            ),
           ],
         ),
 
@@ -178,7 +229,12 @@ class _SettingsBody extends StatelessWidget {
         Center(
           child: Text(
             'POPODORO · v1.0.0',
-            style: TextStyle(fontFamily: AppFonts.mono, fontSize: 10, color: t.ink3, letterSpacing: 0.1),
+            style: TextStyle(
+              fontFamily: AppFonts.mono,
+              fontSize: 10,
+              color: t.ink3,
+              letterSpacing: 0.1,
+            ),
           ),
         ),
       ],
@@ -189,7 +245,12 @@ class _SettingsBody extends StatelessWidget {
 // ── Stats strip ───────────────────────────────────────────────────────────────
 
 class _StatsStrip extends StatelessWidget {
-  const _StatsStrip({required this.t, required this.streak, required this.sessions, required this.totalMins});
+  const _StatsStrip({
+    required this.t,
+    required this.streak,
+    required this.sessions,
+    required this.totalMins,
+  });
   final AppTokens t;
   final int streak;
   final int sessions;
@@ -211,7 +272,11 @@ class _StatsStrip extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _MiniStat(t: t, value: streak > 0 ? '🔥 $streak' : '—', label: 'streak'),
+          _MiniStat(
+            t: t,
+            value: streak > 0 ? '🔥 $streak' : '—',
+            label: 'streak',
+          ),
           Container(width: 1, height: 28, color: t.border),
           _MiniStat(t: t, value: sessions.toString(), label: 'popped'),
           Container(width: 1, height: 28, color: t.border),
@@ -232,9 +297,25 @@ class _MiniStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(value, style: TextStyle(fontFamily: AppFonts.display, fontSize: 20, color: t.ink, height: 1.0)),
+        Text(
+          value,
+          style: TextStyle(
+            fontFamily: AppFonts.display,
+            fontSize: 20,
+            color: t.ink,
+            height: 1.0,
+          ),
+        ),
         const SizedBox(height: 3),
-        Text(label, style: TextStyle(fontFamily: AppFonts.mono, fontSize: 9, color: t.ink3, letterSpacing: 0.1)),
+        Text(
+          label,
+          style: TextStyle(
+            fontFamily: AppFonts.mono,
+            fontSize: 9,
+            color: t.ink3,
+            letterSpacing: 0.1,
+          ),
+        ),
       ],
     );
   }
@@ -254,7 +335,12 @@ class _GroupLabel extends StatelessWidget {
       padding: const EdgeInsets.only(top: 22, bottom: 10, left: 4),
       child: Text(
         label.toUpperCase(),
-        style: TextStyle(fontFamily: AppFonts.mono, fontSize: 10, color: t.ink3, letterSpacing: 0.14),
+        style: TextStyle(
+          fontFamily: AppFonts.mono,
+          fontSize: 10,
+          color: t.ink3,
+          letterSpacing: 0.14,
+        ),
       ),
     );
   }
@@ -283,7 +369,8 @@ class _Separator extends StatelessWidget {
   const _Separator({required this.t});
   final AppTokens t;
   @override
-  Widget build(BuildContext context) => Divider(color: t.border, height: 1, indent: 56);
+  Widget build(BuildContext context) =>
+      Divider(color: t.border, height: 1, indent: 56);
 }
 
 // ── Row types ─────────────────────────────────────────────────────────────────
@@ -318,17 +405,41 @@ class _NavRow extends StatelessWidget {
             Container(
               width: 30,
               height: 30,
-              decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(8)),
+              decoration: BoxDecoration(
+                color: iconBg,
+                borderRadius: BorderRadius.circular(8),
+              ),
               child: Center(
-                child: Text(icon, style: TextStyle(fontSize: 14, color: iconBg == t.ink ? t.bg : t.ink)),
+                child: Text(
+                  icon,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: iconBg == t.ink ? t.bg : t.ink,
+                  ),
+                ),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(label, style: TextStyle(fontFamily: AppFonts.ui, fontSize: 14, fontWeight: FontWeight.w500, color: t.ink)),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontFamily: AppFonts.ui,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: t.ink,
+                ),
+              ),
             ),
             if (value != null) ...[
-              Text(value!, style: TextStyle(fontFamily: AppFonts.mono, fontSize: 12, color: t.ink2)),
+              Text(
+                value!,
+                style: TextStyle(
+                  fontFamily: AppFonts.mono,
+                  fontSize: 12,
+                  color: t.ink2,
+                ),
+              ),
               const SizedBox(width: 6),
             ],
             Icon(Icons.chevron_right_rounded, size: 18, color: t.ink3),
@@ -368,9 +479,25 @@ class _ActionRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label, style: TextStyle(fontFamily: AppFonts.ui, fontSize: 14, fontWeight: FontWeight.w500, color: t.ink)),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontFamily: AppFonts.ui,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: t.ink,
+                    ),
+                  ),
                   if (subtitle != null)
-                    Text(subtitle!, style: TextStyle(fontFamily: AppFonts.ui, fontSize: 12, color: t.ink2, height: 1.4)),
+                    Text(
+                      subtitle!,
+                      style: TextStyle(
+                        fontFamily: AppFonts.ui,
+                        fontSize: 12,
+                        color: t.ink2,
+                        height: 1.4,
+                      ),
+                    ),
                 ],
               ),
             ),

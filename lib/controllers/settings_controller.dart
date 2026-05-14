@@ -3,6 +3,21 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/pomodoro_state.dart';
 
+enum DesktopTrayMode { off, icon, timer }
+
+extension DesktopTrayModeX on DesktopTrayMode {
+  String get label {
+    switch (this) {
+      case DesktopTrayMode.off:
+        return 'Off';
+      case DesktopTrayMode.icon:
+        return 'Icon only';
+      case DesktopTrayMode.timer:
+        return 'Icon + timer';
+    }
+  }
+}
+
 // All user-configurable settings. Persisted to SharedPreferences immediately
 // on every change so there's no explicit "save" step.
 class SettingsController extends ChangeNotifier {
@@ -17,16 +32,18 @@ class SettingsController extends ChangeNotifier {
     required bool autoStartFocus,
     required ThemeMode themeMode,
     required TimerAppearance timerAppearance,
-  })  : _prefs = prefs,
-        _focusMinutes = focusMinutes,
-        _shortBreakMinutes = shortBreakMinutes,
-        _longBreakMinutes = longBreakMinutes,
-        _sessionsBeforeLongBreak = sessionsBeforeLongBreak,
-        _soundEnabled = soundEnabled,
-        _autoStartBreaks = autoStartBreaks,
-        _autoStartFocus = autoStartFocus,
-        _themeMode = themeMode,
-        _timerAppearance = timerAppearance;
+    required DesktopTrayMode desktopTrayMode,
+  }) : _prefs = prefs,
+       _focusMinutes = focusMinutes,
+       _shortBreakMinutes = shortBreakMinutes,
+       _longBreakMinutes = longBreakMinutes,
+       _sessionsBeforeLongBreak = sessionsBeforeLongBreak,
+       _soundEnabled = soundEnabled,
+       _autoStartBreaks = autoStartBreaks,
+       _autoStartFocus = autoStartFocus,
+       _themeMode = themeMode,
+       _timerAppearance = timerAppearance,
+       _desktopTrayMode = desktopTrayMode;
 
   // Load from disk. Call once before runApp.
   static Future<SettingsController> load() async {
@@ -41,7 +58,10 @@ class SettingsController extends ChangeNotifier {
       autoStartBreaks: prefs.getBool(_kAutoBreak) ?? false,
       autoStartFocus: prefs.getBool(_kAutoFocus) ?? false,
       themeMode: ThemeMode.values[prefs.getInt(_kTheme) ?? 0],
-      timerAppearance: TimerAppearance.values[prefs.getInt(_kTimerAppearance) ?? 0],
+      timerAppearance:
+          TimerAppearance.values[prefs.getInt(_kTimerAppearance) ?? 0],
+      desktopTrayMode:
+          DesktopTrayMode.values[prefs.getInt(_kDesktopTrayMode) ?? 0],
     );
   }
 
@@ -55,6 +75,7 @@ class SettingsController extends ChangeNotifier {
   static const _kAutoFocus = 'autoStartFocus';
   static const _kTheme = 'themeMode';
   static const _kTimerAppearance = 'timerAppearance';
+  static const _kDesktopTrayMode = 'desktopTrayMode';
 
   final SharedPreferences _prefs;
 
@@ -68,6 +89,7 @@ class SettingsController extends ChangeNotifier {
   bool _autoStartFocus;
   ThemeMode _themeMode;
   TimerAppearance _timerAppearance;
+  DesktopTrayMode _desktopTrayMode;
 
   // ── Getters ──────────────────────────────────────────────────────────────────
   SharedPreferences get prefs => _prefs;
@@ -80,6 +102,7 @@ class SettingsController extends ChangeNotifier {
   bool get autoStartFocus => _autoStartFocus;
   ThemeMode get themeMode => _themeMode;
   TimerAppearance get timerAppearance => _timerAppearance;
+  DesktopTrayMode get desktopTrayMode => _desktopTrayMode;
 
   // Valid option sets used by the UI
   static const focusOptions = [15, 25, 50, 90];
@@ -148,6 +171,13 @@ class SettingsController extends ChangeNotifier {
     if (_timerAppearance == v) return;
     _timerAppearance = v;
     _prefs.setInt(_kTimerAppearance, v.index);
+    notifyListeners();
+  }
+
+  set desktopTrayMode(DesktopTrayMode v) {
+    if (_desktopTrayMode == v) return;
+    _desktopTrayMode = v;
+    _prefs.setInt(_kDesktopTrayMode, v.index);
     notifyListeners();
   }
 }
