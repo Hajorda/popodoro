@@ -27,127 +27,127 @@
 		<dict>
 			<key>cdhash</key>
 			<data>
-			z1ZnBAsiz/CXi6VQUx7T85PUt74=
+			erWlZ8Zt43idpa+z43OaGVXOpBk=
 			</data>
 			<key>requirement</key>
-			<string>cdhash H"cf5667040b22cff0978ba550531ed3f393d4b7be" or cdhash H"860df319e7124f270614b603afa4298ed3bd2cf9"</string>
+			<string>identifier "io.flutter.flutter.app" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: ALI BOLAT (CQJJC7P3QP)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
 		</dict>
 		<key>Frameworks/FlutterMacOS.framework</key>
 		<dict>
 			<key>cdhash</key>
 			<data>
-			7XBXOpnuprHftd5KwanQGAGNy9Q=
+			yq1O9cKxAwZelchXeHT6gy9ZJIM=
 			</data>
 			<key>requirement</key>
-			<string>cdhash H"ed70573a99eea6b1dfb5de4ac1a9d018018dcbd4" or cdhash H"62b08cc789d9073160693c41b1e6e96a8e0f900b"</string>
+			<string>identifier "io.flutter.flutter-macos" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: ALI BOLAT (CQJJC7P3QP)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
 		</dict>
 		<key>Frameworks/app_links.framework</key>
 		<dict>
 			<key>cdhash</key>
 			<data>
-			HH9FFTNwe9fSlHWA/P/iBe1Zi20=
+			Oc6bEwioDf4vG8NmYi8spFOcvVY=
 			</data>
 			<key>requirement</key>
-			<string>cdhash H"1c7f451533707bd7d2947580fcffe205ed598b6d" or cdhash H"a5cd1729164d4183eebb01c0a209d844edc2af62"</string>
+			<string>identifier "org.cocoapods.app-links" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: ALI BOLAT (CQJJC7P3QP)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
 		</dict>
 		<key>Frameworks/audioplayers_darwin.framework</key>
 		<dict>
 			<key>cdhash</key>
 			<data>
-			CazQFf2VVOQskD1/MVi0CLPPkKU=
+			d2g7PoDtLIxpeSynRLDT04FNcNs=
 			</data>
 			<key>requirement</key>
-			<string>cdhash H"09acd015fd9554e42c903d7f3158b408b3cf90a5" or cdhash H"d061c9a48a9058e1af9566a37dc80d245d39b3a0"</string>
+			<string>identifier "org.cocoapods.audioplayers-darwin" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: ALI BOLAT (CQJJC7P3QP)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
 		</dict>
 		<key>Frameworks/libswift_Concurrency.dylib</key>
 		<dict>
 			<key>cdhash</key>
 			<data>
-			Pr3e+QFHQ3D2oyoywLeBrPU4s88=
+			kjAbUBYdV70OZP9rni5IO8ANaCc=
 			</data>
 			<key>requirement</key>
-			<string>cdhash H"3ebddef901474370f6a32a32c0b781acf538b3cf" or cdhash H"2df8f77ca131cd10508992f453212709099ea525"</string>
+			<string>identifier "com.apple.dt.runtime.swiftConcurrency" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: ALI BOLAT (CQJJC7P3QP)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
 		</dict>
 		<key>Frameworks/objective_c.framework</key>
 		<dict>
 			<key>cdhash</key>
 			<data>
-			XstWq2QGH+Uv4zZVlmw0X/NxrPM=
+			c+pNVtl1vIo9QQqaY8Ai0vla9vs=
 			</data>
 			<key>requirement</key>
-			<string>cdhash H"5ecb56ab64061fe52fe33655966c345ff371acf3" or cdhash H"c73bafeda2b3df6bd98ad0a1caf77387012736ca"</string>
+			<string>identifier "io.flutter.flutter.native-assets.objective-c" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: ALI BOLAT (CQJJC7P3QP)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
 		</dict>
 		<key>Frameworks/package_info_plus.framework</key>
 		<dict>
 			<key>cdhash</key>
 			<data>
-			rbPQASLA82N6yUFYdEd+Itm6eSU=
+			j7rzOO/rv3IHpX4ghsVdp88oFrc=
 			</data>
 			<key>requirement</key>
-			<string>cdhash H"adb3d00122c0f3637ac9415874477e22d9ba7925" or cdhash H"42ef7a2e0cedb702c8fec954d7517799c0810820"</string>
+			<string>identifier "org.cocoapods.package-info-plus" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: ALI BOLAT (CQJJC7P3QP)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
 		</dict>
 		<key>Frameworks/screen_retriever_macos.framework</key>
 		<dict>
 			<key>cdhash</key>
 			<data>
-			2zNPIoYwTtVxTvej1tbFIjqPDiA=
+			C3L2xG6ZDgYZNs39fUpCz1dYpF0=
 			</data>
 			<key>requirement</key>
-			<string>cdhash H"db334f2286304ed5714ef7a3d6d6c5223a8f0e20" or cdhash H"50161cfc4b0a2c64a5f80364bf5657fe03e4ef32"</string>
+			<string>identifier "org.cocoapods.screen-retriever-macos" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: ALI BOLAT (CQJJC7P3QP)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
 		</dict>
 		<key>Frameworks/shared_preferences_foundation.framework</key>
 		<dict>
 			<key>cdhash</key>
 			<data>
-			cn2Ljyzbc5kJkF/xx+lb/WaGS8Q=
+			/uhIsGoErGVJoWuNQd7dA2Fi81M=
 			</data>
 			<key>requirement</key>
-			<string>cdhash H"727d8b8f2cdb739909905ff1c7e95bfd66864bc4" or cdhash H"f2580d446842463055021ead2770d0ee32e5572b"</string>
+			<string>identifier "org.cocoapods.shared-preferences-foundation" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: ALI BOLAT (CQJJC7P3QP)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
 		</dict>
 		<key>Frameworks/sqlite3.framework</key>
 		<dict>
 			<key>cdhash</key>
 			<data>
-			OGVMlPomgTj2FyH4N+YdXrmT5Fk=
+			rOsJbupH9usuu2fmvSguR+JKKsw=
 			</data>
 			<key>requirement</key>
-			<string>cdhash H"38654c94fa268138f61721f837e61d5eb993e459" or cdhash H"32dfdcd9d22c582265bf80b57fca313b4f37966b"</string>
+			<string>identifier "io.flutter.flutter.native-assets.sqlite3" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: ALI BOLAT (CQJJC7P3QP)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
 		</dict>
 		<key>Frameworks/tflite_flutter.framework</key>
 		<dict>
 			<key>cdhash</key>
 			<data>
-			NCn5J/9zdymMfs3Pc44Wx0Q+2eQ=
+			UO+oCAANto2iUenmejpWB+kWJA8=
 			</data>
 			<key>requirement</key>
-			<string>cdhash H"3429f927ff7377298c7ecdcf738e16c7443ed9e4" or cdhash H"9b4a46ab72e6ecbf11e155571ba0f0b4e6f3b142"</string>
+			<string>identifier "org.cocoapods.tflite-flutter" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: ALI BOLAT (CQJJC7P3QP)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
 		</dict>
 		<key>Frameworks/tray_manager.framework</key>
 		<dict>
 			<key>cdhash</key>
 			<data>
-			QZygUqKxB8IMPW002qa8a/TKg5o=
+			mU+ebgn41PVMCgeQjVzXtlUl3cQ=
 			</data>
 			<key>requirement</key>
-			<string>cdhash H"419ca052a2b107c20c3d6d34daa6bc6bf4ca839a" or cdhash H"43152296909a97279f8e34564bc30284b9b6c919"</string>
+			<string>identifier "org.cocoapods.tray-manager" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: ALI BOLAT (CQJJC7P3QP)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
 		</dict>
 		<key>Frameworks/url_launcher_macos.framework</key>
 		<dict>
 			<key>cdhash</key>
 			<data>
-			JvjI9/4VRx0y6GQHFqeBGjf9FcU=
+			F+jHaznQOzL2bUaawX6qbA8tHPs=
 			</data>
 			<key>requirement</key>
-			<string>cdhash H"26f8c8f7fe15471d32e8640716a7811a37fd15c5" or cdhash H"9c33955ad5d17456ea1958f8223818178ed7dbcd"</string>
+			<string>identifier "org.cocoapods.url-launcher-macos" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: ALI BOLAT (CQJJC7P3QP)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
 		</dict>
 		<key>Frameworks/window_manager.framework</key>
 		<dict>
 			<key>cdhash</key>
 			<data>
-			DFQSXWm7sb0OPITKjYxmwlQbQmc=
+			3+ZLR8hdBJ3xrZ9USBkfpgx11jM=
 			</data>
 			<key>requirement</key>
-			<string>cdhash H"0c54125d69bbb1bd0e3c84ca8d8c66c2541b4267" or cdhash H"7c164085d3b00ad41dfdfbe770684d00701f900f"</string>
+			<string>identifier "org.cocoapods.window-manager" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: ALI BOLAT (CQJJC7P3QP)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
 		</dict>
 		<key>Resources/AppIcon.icns</key>
 		<dict>
