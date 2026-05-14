@@ -19,7 +19,7 @@ import '../models/pomodoro_state.dart';
 
 enum GuardStatus { idle, active, noPersonDetected, phoneDetected, cameraError }
 
-enum CameraFailure { permissionDenied, noCamera, other }
+enum CameraFailure { permissionDenied, noCamera, notSupported, other }
 
 const _kPersonClass = 0;
 const _kPhoneClass = 67; // falls back gracefully if model has fewer classes
@@ -105,13 +105,18 @@ class FocusGuardService extends ChangeNotifier {
       return _requestAndTestCameraMacOS();
     }
 
+    if (Platform.isWindows) {
+      // camera package has no Windows implementation in this Flutter version.
+      // Upgrading Flutter to Dart >=3.11 and adding camera_desktop would enable it.
+      _lastCameraFailure = CameraFailure.notSupported;
+      return false;
+    }
+
     // Mobile: use permission_handler
-    if (!Platform.isWindows) {
-      final status = await Permission.camera.request();
-      if (!status.isGranted) {
-        _lastCameraFailure = CameraFailure.permissionDenied;
-        return false;
-      }
+    final status = await Permission.camera.request();
+    if (!status.isGranted) {
+      _lastCameraFailure = CameraFailure.permissionDenied;
+      return false;
     }
 
     return _probeCameraMobile();

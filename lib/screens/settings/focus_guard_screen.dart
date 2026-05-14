@@ -335,6 +335,12 @@ class _EnableTileState extends State<_EnableTile> {
             : 'Open Windows Settings → Privacy & security → Camera '
                 'and make sure "Let apps access your camera" is on.';
         canOpenSettings = true;
+      case CameraFailure.notSupported:
+        title = 'Not available on Windows';
+        body = 'Focus Guard camera support on Windows requires upgrading '
+            'to a newer Flutter SDK (Dart ≥ 3.11). '
+            'This will be enabled in a future update.';
+        canOpenSettings = false;
       case CameraFailure.other:
       case null:
         title = 'Camera unavailable';
