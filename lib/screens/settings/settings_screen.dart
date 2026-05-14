@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../controllers/history_controller.dart';
 import '../../controllers/settings_controller.dart';
@@ -8,6 +10,7 @@ import '../../core/theme/app_typography.dart';
 import '../../models/pomodoro_state.dart';
 import '../../services/auth_service.dart';
 import '../../services/sync_service.dart';
+import '../../services/update_service.dart';
 import '../../services/window_service.dart';
 import '../../services/bg_music_service.dart';
 import 'account_screen.dart';
@@ -271,18 +274,11 @@ class _SettingsBody extends StatelessWidget {
           ],
         ),
 
-        const SizedBox(height: 24),
-        Center(
-          child: Text(
-            'POPODORO · v1.0.0',
-            style: TextStyle(
-              fontFamily: AppFonts.mono,
-              fontSize: 10,
-              color: t.ink3,
-              letterSpacing: 0.1,
-            ),
-          ),
-        ),
+        // About
+        _GroupLabel(t: t, label: 'About'),
+        _AboutSection(t: t),
+
+        const SizedBox(height: 32),
       ],
     );
   }
@@ -494,6 +490,215 @@ class _NavRow extends StatelessWidget {
     );
   }
 }
+
+// ── About section ─────────────────────────────────────────────────────────────
+
+enum _UpdateState { idle, checking, upToDate, available, error }
+
+class _AboutSection extends StatefulWidget {
+  const _AboutSection({required this.t});
+  final AppTokens t;
+
+  @override
+  State<_AboutSection> createState() => _AboutSectionState();
+}
+
+class _AboutSectionState extends State<_AboutSection> {
+  String _version = '—';
+  _UpdateState _updateState = _UpdateState.idle;
+  UpdateInfo? _updateInfo;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) setState(() => _version = info.version);
+  }
+
+  Future<void> _checkForUpdate() async {
+    if (_updateState == _UpdateState.checking) return;
+    setState(() => _updateState = _UpdateState.checking);
+    try {
+      final info = await UpdateService.checkForUpdate();
+      if (!mounted) return;
+      setState(() {
+        _updateInfo = info;
+        _updateState =
+            info != null ? _UpdateState.available : _UpdateState.upToDate;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _updateState = _UpdateState.error);
+    }
+  }
+
+  Future<void> _openDownload() async {
+    final url = _updateInfo?.downloadUrl;
+    if (url == null) return;
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) await launchUrl(uri);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = widget.t;
+    return _SetGroup(
+      t: t,
+      children: [
+        // Version row
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+          child: Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: t.surface2,
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: Center(
+                  child: Text(
+                    'v',
+                    style: TextStyle(
+                      fontFamily: AppFonts.mono,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: t.ink2,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Version',
+                  style: TextStyle(
+                    fontFamily: AppFonts.ui,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: t.ink,
+                  ),
+                ),
+              ),
+              Text(
+                _version,
+                style: TextStyle(
+                  fontFamily: AppFonts.mono,
+                  fontSize: 13,
+                  color: t.ink3,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        _Separator(t: t),
+
+        // Check for updates row
+        GestureDetector(
+          onTap: _updateState == _UpdateState.available
+              ? _openDownload
+              : _checkForUpdate,
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+            child: Row(
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: t.sage.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      Icons.arrow_circle_up_rounded,
+                      size: 16,
+                      color: t.sage,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _updateState == _UpdateState.available
+                            ? 'Update available'
+                            : 'Check for updates',
+                        style: TextStyle(
+                          fontFamily: AppFonts.ui,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: _updateState == _UpdateState.available
+                              ? t.sage
+                              : t.ink,
+                        ),
+                      ),
+                      if (_updateState == _UpdateState.available &&
+                          _updateInfo != null)
+                        Text(
+                          'v${_updateInfo!.version} ready to download',
+                          style: TextStyle(
+                            fontFamily: AppFonts.ui,
+                            fontSize: 12,
+                            color: t.sage,
+                            height: 1.4,
+                          ),
+                        )
+                      else if (_updateState == _UpdateState.upToDate)
+                        Text(
+                          "You're on the latest version",
+                          style: TextStyle(
+                            fontFamily: AppFonts.ui,
+                            fontSize: 12,
+                            color: t.ink3,
+                            height: 1.4,
+                          ),
+                        )
+                      else if (_updateState == _UpdateState.error)
+                        Text(
+                          'Check failed — try again',
+                          style: TextStyle(
+                            fontFamily: AppFonts.ui,
+                            fontSize: 12,
+                            color: t.ember,
+                            height: 1.4,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (_updateState == _UpdateState.checking)
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.5,
+                      color: t.ink3,
+                    ),
+                  )
+                else if (_updateState == _UpdateState.available)
+                  Icon(Icons.download_rounded, size: 18, color: t.sage)
+                else
+                  Icon(Icons.chevron_right_rounded, size: 18, color: t.ink3),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Action row ────────────────────────────────────────────────────────────────
 
 class _ActionRow extends StatelessWidget {
   const _ActionRow({
