@@ -222,11 +222,12 @@ class DesktopTrayService with WindowListener, TrayListener {
   }
 
   Future<String> _resolveIconAssetPath() async {
-    const localAsset = 'assets/icon/icon.png';
-    final packagedAsset =
-        '${Directory.current.path}/data/flutter_assets/$localAsset';
-    if (await File(packagedAsset).exists()) return localAsset;
-    return localAsset;
+    // macOS uses a template image (black on transparent, auto-tinted by the OS).
+    // Windows uses the full-color app icon.
+    if (!kIsWeb && Platform.isMacOS) {
+      return 'assets/icon/tray_icon.png';
+    }
+    return 'assets/icon/icon.png';
   }
 
   void dispose() {

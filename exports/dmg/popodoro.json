@@ -1,0 +1,23 @@
+{
+  "title": "Popodoro",
+  "icon": "Popodoro.icns",
+  "background": "background.png",
+  "icon-size": 100,
+  "window": {
+    "position": { "x": 200, "y": 150 },
+    "size": { "width": 660, "height": 420 }
+  },
+  "format": "ULFO",
+  "contents": [
+    {
+      "x": 170, "y": 210,
+      "type": "file",
+      "path": "../Runner/Popodoro.app"
+    },
+    {
+      "x": 490, "y": 210,
+      "type": "link",
+      "path": "/Applications"
+    }
+  ]
+}
