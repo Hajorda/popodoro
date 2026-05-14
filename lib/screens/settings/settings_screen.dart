@@ -6,7 +6,10 @@ import '../../controllers/settings_controller.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/pomodoro_state.dart';
+import '../../services/auth_service.dart';
+import '../../services/sync_service.dart';
 import '../../services/window_service.dart';
+import 'account_screen.dart';
 import 'appearance_screen.dart';
 import 'desktop_tray_settings_screen.dart';
 import 'nudges_screen.dart';
@@ -205,22 +208,27 @@ class _SettingsBody extends StatelessWidget {
         ),
 
         // Account
-        _GroupLabel(
-          t: t,
-          label: 'Account',
-          foot:
-              'Popodoro is offline-first. Your data never leaves your device.',
-        ),
+        _GroupLabel(t: t, label: 'Account'),
         _SetGroup(
           t: t,
           children: [
-            _NavRow(
-              t: t,
-              icon: '↗',
-              iconBg: t.surface2,
-              label: 'Export data',
-              isLast: true,
-              onTap: () {},
+            Consumer2<AuthService, SyncService>(
+              builder: (context, auth, sync, _) => _NavRow(
+                t: t,
+                icon: auth.isSignedIn ? '✓' : '↑',
+                iconBg: auth.isSignedIn ? t.sage : t.surface2,
+                label: 'Sync & backup',
+                value: auth.isSignedIn
+                    ? (sync.pendingCount > 0
+                        ? '${sync.pendingCount} pending'
+                        : 'synced')
+                    : 'sign in',
+                isLast: true,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                      builder: (_) => const AccountScreen()),
+                ),
+              ),
             ),
           ],
         ),
@@ -324,10 +332,9 @@ class _MiniStat extends StatelessWidget {
 // ── Group primitives ──────────────────────────────────────────────────────────
 
 class _GroupLabel extends StatelessWidget {
-  const _GroupLabel({required this.t, required this.label, this.foot});
+  const _GroupLabel({required this.t, required this.label});
   final AppTokens t;
   final String label;
-  final String? foot;
 
   @override
   Widget build(BuildContext context) {

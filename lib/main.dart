@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'controllers/history_controller.dart';
@@ -8,13 +9,20 @@ import 'controllers/timer_controller.dart';
 import 'core/theme/app_theme.dart';
 import 'database/app_database.dart';
 import 'screens/shell.dart';
+import 'services/auth_service.dart';
 import 'services/desktop_tray_service.dart';
 import 'services/sound_service.dart';
 import 'services/sync_service.dart';
 import 'services/window_service.dart';
 
+const _supabaseUrl = 'https://ysbbdxvwittczfrezzlm.supabase.co';
+const _supabaseAnonKey =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlzYmJkeHZ3aXR0Y3pmcmV6emxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MDcxNDQsImV4cCI6MjA5NDI4MzE0NH0.2zrSPEtZkYahEmEuW9n9bCIvuCkjZ1jZKMBFTFMEHn4';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(url: _supabaseUrl, anonKey: _supabaseAnonKey);
 
   await windowManager.ensureInitialized();
 
@@ -36,7 +44,7 @@ void main() async {
   final sync = SyncService(db: db);
   final history = HistoryController(
     db: db,
-    legacyPrefs: settings.prefs, // one-time migration from SharedPreferences
+    legacyPrefs: settings.prefs,
     onNewSession: sync.requestSync,
   );
 
@@ -64,6 +72,11 @@ class PopodoroApp extends StatelessWidget {
         ChangeNotifierProvider.value(value: settings),
         ChangeNotifierProvider.value(value: history),
         ChangeNotifierProvider.value(value: sync),
+        // AuthService depends on SyncService, so it comes after.
+        ChangeNotifierProxyProvider<SyncService, AuthService>(
+          create: (ctx) => AuthService(sync: ctx.read<SyncService>()),
+          update: (_, sync, previous) => previous!,
+        ),
         ChangeNotifierProvider<WindowService>(
           create: (ctx) =>
               WindowService(prefs: ctx.read<SettingsController>().prefs),

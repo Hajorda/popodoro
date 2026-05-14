@@ -1,64 +1,60 @@
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../database/app_database.dart';
 
 /// Syncs locally-recorded sessions to Supabase.
 ///
-/// Offline-first design:
-///   - Every session is written to Drift with syncedToCloud = false.
-///   - [requestSync] is called after each new session and on app resume.
-///   - When a Supabase client is available (post-auth), pending rows are
-///     uploaded in a single batch and marked synced on success.
-///   - If the upload fails (offline, timeout) the rows stay pending and
-///     will be retried on the next [requestSync] call.
+/// Fully offline-first — the app never requires an account.
+/// Sync only activates after the user explicitly signs in (via AuthService).
 ///
-/// Wiring Supabase (done when auth is added):
-///   1. Add `supabase_flutter` to pubspec.yaml.
-///   2. Call `Supabase.initialize(url: ..., anonKey: ...)` in main().
-///   3. Pass `Supabase.instance.client` to [setClient] once the user signs in.
-///   4. The upload logic inside [_upload] is already stubbed — just fill it in.
+/// Flow:
+///   1. Session completes → written to SQLite (synced_to_cloud = false).
+///   2. [requestSync] is called → no-op if user is not signed in.
+///   3. User signs in → [requestSync] is called → all pending rows upload.
+///   4. Future sessions sync immediately after being recorded.
 class SyncService extends ChangeNotifier {
   SyncService({required AppDatabase db}) : _db = db;
 
   final AppDatabase _db;
-
-  // Set to the authenticated SupabaseClient once auth is wired in.
-  // Typed as dynamic so this file compiles without supabase_flutter.
-  dynamic _client;
+  SupabaseClient get _client => Supabase.instance.client;
 
   bool _syncing = false;
   DateTime? _lastSyncedAt;
   int _pendingCount = 0;
+  String? _lastError;
 
   bool get isSyncing => _syncing;
   DateTime? get lastSyncedAt => _lastSyncedAt;
   int get pendingCount => _pendingCount;
-  bool get isConnectedToCloud => _client != null;
+  String? get lastError => _lastError;
+  bool get isSignedIn => _client.auth.currentUser != null;
 
-  // ── Public API ───────────────────────────────────────────────────────────────
+  // ── Public API ────────────────────────────────────────────────────────────────
 
-  /// Called after a new session is recorded or on app resume.
+  /// Refreshes the pending count from the DB. Call when the account screen opens.
+  Future<void> refreshPendingCount() => _refreshPendingCount();
+
+  /// Called after each new session and on app resume.
+  /// No-op when the user is not signed in.
   Future<void> requestSync() async {
     await _refreshPendingCount();
-    if (_client == null) return; // no-op until auth is wired
-    if (_syncing) return;
+    if (!isSignedIn || _syncing) return;
     await _upload();
   }
 
-  /// Called from auth layer once the user signs in.
-  Future<void> setClient(dynamic client) async {
-    _client = client;
+  /// Called by AuthService after successful sign-in to flush the backlog.
+  Future<void> onSignedIn() async {
     notifyListeners();
-    await requestSync();
+    await _upload();
   }
 
-  /// Called when the user signs out.
-  void clearClient() {
-    _client = null;
+  /// Called by AuthService on sign-out.
+  void onSignedOut() {
     notifyListeners();
   }
 
-  // ── Internal ─────────────────────────────────────────────────────────────────
+  // ── Internal ──────────────────────────────────────────────────────────────────
 
   Future<void> _refreshPendingCount() async {
     final rows = await _db.fetchUnsynced();
@@ -66,37 +62,43 @@ class SyncService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Upload all pending rows to Supabase, mark them synced on success.
-  ///
-  /// STUB — fill in when supabase_flutter is added:
-  ///
-  /// ```dart
-  /// final client = _client as SupabaseClient;
-  /// final payload = unsynced.map((r) => {
-  ///   'id': r.id,
-  ///   'user_id': client.auth.currentUser!.id,
-  ///   'start_time': DateTime.fromMillisecondsSinceEpoch(r.startTimeMs).toIso8601String(),
-  ///   'duration_minutes': r.durationMinutes,
-  ///   'task_name': r.taskName,
-  /// }).toList();
-  /// await client.from('sessions').upsert(payload);
-  /// await _db.markSynced(unsynced.map((r) => r.id).toList());
-  /// ```
   Future<void> _upload() async {
+    final unsynced = await _db.fetchUnsynced();
+    if (unsynced.isEmpty) return;
+
     _syncing = true;
+    _lastError = null;
     notifyListeners();
+
     try {
-      final unsynced = await _db.fetchUnsynced();
-      if (unsynced.isEmpty) return;
+      final userId = _client.auth.currentUser!.id;
 
-      // ── Supabase upload goes here ──────────────────────────────────────────
-      // (stubbed until supabase_flutter is added + credentials provided)
-      // ------------------------------------------------------------------
+      final payload = unsynced
+          .map((r) => {
+                'id': r.id,
+                'user_id': userId,
+                'start_time': DateTime.fromMillisecondsSinceEpoch(r.startTimeMs)
+                    .toUtc()
+                    .toIso8601String(),
+                'duration_minutes': r.durationMinutes,
+                if (r.taskName != null) 'task_name': r.taskName,
+              })
+          .toList();
 
-      _lastSyncedAt = DateTime.now();
+      await _client.from('sessions').upsert(payload);
+      await _db.markSynced(unsynced.map((r) => r.id).toList());
+
       _pendingCount = 0;
+      _lastSyncedAt = DateTime.now();
+    } on AuthException catch (e) {
+      _lastError = e.message;
+      debugPrint('[SyncService] auth error: $e');
+    } on PostgrestException catch (e) {
+      _lastError = e.message;
+      debugPrint('[SyncService] db error: $e');
     } catch (e) {
-      debugPrint('[SyncService] upload failed: $e');
+      // Network error — rows stay pending, will retry on next requestSync.
+      debugPrint('[SyncService] upload failed (offline?): $e');
     } finally {
       _syncing = false;
       notifyListeners();
