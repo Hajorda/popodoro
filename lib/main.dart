@@ -6,9 +6,11 @@ import 'controllers/history_controller.dart';
 import 'controllers/settings_controller.dart';
 import 'controllers/timer_controller.dart';
 import 'core/theme/app_theme.dart';
+import 'database/app_database.dart';
 import 'screens/shell.dart';
 import 'services/desktop_tray_service.dart';
 import 'services/sound_service.dart';
+import 'services/sync_service.dart';
 import 'services/window_service.dart';
 
 void main() async {
@@ -30,15 +32,30 @@ void main() async {
   });
 
   final settings = await SettingsController.load();
-  final history = HistoryController(prefs: settings.prefs);
-  runApp(PopodoroApp(settings: settings, history: history));
+  final db = await AppDatabase.open();
+  final sync = SyncService(db: db);
+  final history = HistoryController(
+    db: db,
+    legacyPrefs: settings.prefs, // one-time migration from SharedPreferences
+    onNewSession: sync.requestSync,
+  );
+
+  runApp(PopodoroApp(settings: settings, history: history, db: db, sync: sync));
 }
 
 class PopodoroApp extends StatelessWidget {
-  const PopodoroApp({super.key, required this.settings, required this.history});
+  const PopodoroApp({
+    super.key,
+    required this.settings,
+    required this.history,
+    required this.db,
+    required this.sync,
+  });
 
   final SettingsController settings;
   final HistoryController history;
+  final AppDatabase db;
+  final SyncService sync;
 
   @override
   Widget build(BuildContext context) {
@@ -46,6 +63,7 @@ class PopodoroApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider.value(value: settings),
         ChangeNotifierProvider.value(value: history),
+        ChangeNotifierProvider.value(value: sync),
         ChangeNotifierProvider<WindowService>(
           create: (ctx) =>
               WindowService(prefs: ctx.read<SettingsController>().prefs),

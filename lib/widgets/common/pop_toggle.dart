@@ -35,7 +35,9 @@ class PopToggle extends StatelessWidget {
       child: GestureDetector(
         onTap: disabled ? null : () => onChanged(!value),
         behavior: HitTestBehavior.opaque,
-        child: Row(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+          child: Row(
           children: [
             Expanded(
               child: Column(
@@ -44,8 +46,8 @@ class PopToggle extends StatelessWidget {
                 children: [
                   Text(
                     label,
-                    style: TextStyle(fontFamily: AppFonts.ui, 
-                      fontSize: 15,
+                    style: TextStyle(fontFamily: AppFonts.ui,
+                      fontSize: 14,
                       fontWeight: FontWeight.w500,
                       color: inkColor,
                       height: 1.3,
@@ -71,6 +73,7 @@ class PopToggle extends StatelessWidget {
               borderColor: borderColor,
             ),
           ],
+          ),
         ),
       ),
     );

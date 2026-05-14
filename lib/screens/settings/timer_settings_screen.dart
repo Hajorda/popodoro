@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../controllers/settings_controller.dart';
@@ -68,44 +69,41 @@ class _Body extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
       children: [
-        // Rhythm preview hero
         const SizedBox(height: 12),
         _RhythmHero(t: t, settings: settings),
         const SizedBox(height: 22),
 
-        // Focus duration
         _Field(t: t, label: 'Focus session', child: _ChipRow(
           t: t,
           options: SettingsController.focusOptions,
           selected: settings.focusMinutes,
+          min: 1, max: 180,
           onSelect: (v) => settings.focusMinutes = v,
         )),
         const SizedBox(height: 18),
 
-        // Short break
         _Field(t: t, label: 'Short break', child: _ChipRow(
           t: t,
           options: SettingsController.shortBreakOptions,
           selected: settings.shortBreakMinutes,
+          min: 1, max: 60,
           onSelect: (v) => settings.shortBreakMinutes = v,
         )),
         const SizedBox(height: 18),
 
-        // Long break
         _Field(t: t, label: 'Long break', child: _ChipRow(
           t: t,
           options: SettingsController.longBreakOptions,
           selected: settings.longBreakMinutes,
+          min: 1, max: 120,
           onSelect: (v) => settings.longBreakMinutes = v,
         )),
         const SizedBox(height: 18),
 
-        // Sessions before long break
         _Field(t: t, label: 'Sessions before long break',
-          child: _SessionDots(t: t, settings: settings)),
+          child: _SessionPicker(t: t, settings: settings)),
         const SizedBox(height: 24),
 
-        // Automation toggles
         _Label(t: t, label: 'Automation'),
         Container(
           decoration: BoxDecoration(color: t.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: t.border)),
@@ -180,7 +178,6 @@ class _RhythmHero extends StatelessWidget {
           Text('FOCUS · SHORT · LONG (MIN)',
               style: TextStyle(fontFamily: AppFonts.mono, fontSize: 10, color: t.ink3, letterSpacing: 0.14)),
           const SizedBox(height: 14),
-          // Rhythm bar
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: SizedBox(
@@ -195,6 +192,12 @@ class _RhythmHero extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: 10),
+          // One full cycle summary
+          Text(
+            '${settings.sessionsBeforeLongBreak} sessions · then ${settings.longBreakMinutes}m long break',
+            style: TextStyle(fontFamily: AppFonts.mono, fontSize: 10, color: t.ink3, letterSpacing: 0.05),
+          ),
         ],
       ),
     );
@@ -204,95 +207,219 @@ class _RhythmHero extends StatelessWidget {
 // ── Duration chip row ─────────────────────────────────────────────────────────
 
 class _ChipRow extends StatelessWidget {
-  const _ChipRow({required this.t, required this.options, required this.selected, required this.onSelect});
+  const _ChipRow({
+    required this.t,
+    required this.options,
+    required this.selected,
+    required this.min,
+    required this.max,
+    required this.onSelect,
+  });
   final AppTokens t;
   final List<int> options;
   final int selected;
+  final int min;
+  final int max;
   final ValueChanged<int> onSelect;
+
+  void _showCustomDialog(BuildContext context) {
+    final controller = TextEditingController(
+      text: options.contains(selected) ? '' : '$selected',
+    );
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: t.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text('Custom duration',
+            style: TextStyle(fontFamily: AppFonts.ui, fontSize: 16, fontWeight: FontWeight.w600, color: t.ink)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              style: TextStyle(fontFamily: AppFonts.display, fontSize: 32, color: t.ink, letterSpacing: -0.5),
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                hintText: '$min–$max',
+                hintStyle: TextStyle(fontFamily: AppFonts.mono, fontSize: 14, color: t.ink3),
+                suffix: Text('min', style: TextStyle(fontFamily: AppFonts.mono, fontSize: 12, color: t.ink3)),
+                enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: t.border)),
+                focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: t.pop, width: 2)),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text('$min – $max minutes', style: TextStyle(fontFamily: AppFonts.mono, fontSize: 10, color: t.ink3)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Cancel', style: TextStyle(fontFamily: AppFonts.ui, color: t.ink2)),
+          ),
+          TextButton(
+            onPressed: () {
+              final v = int.tryParse(controller.text);
+              if (v != null && v >= min && v <= max) {
+                onSelect(v);
+                Navigator.of(ctx).pop();
+              }
+            },
+            child: Text('Set', style: TextStyle(fontFamily: AppFonts.ui, color: t.pop, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isCustom = !options.contains(selected);
+
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: options.map((v) {
-        final on = v == selected;
-        return GestureDetector(
-          onTap: () => onSelect(v),
+      children: [
+        ...options.map((v) {
+          final on = v == selected;
+          return GestureDetector(
+            onTap: () => onSelect(v),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: on ? t.ink : t.surface,
+                border: Border.all(color: on ? t.ink : t.border),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: RichText(
+                text: TextSpan(
+                  style: TextStyle(fontFamily: AppFonts.display, fontSize: 17, color: on ? t.bg : t.ink),
+                  children: [
+                    TextSpan(text: '$v'),
+                    TextSpan(
+                      text: ' min',
+                      style: TextStyle(fontFamily: AppFonts.mono, fontSize: 9, color: (on ? t.bg : t.ink).withValues(alpha: 0.6)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+        // Custom chip — shows current custom value when active, "+" otherwise
+        GestureDetector(
+          onTap: () => _showCustomDialog(context),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: on ? t.ink : t.surface,
-              border: Border.all(color: on ? t.ink : t.border),
+              color: isCustom ? t.ink : t.surface,
+              border: Border.all(color: isCustom ? t.ink : t.border),
               borderRadius: BorderRadius.circular(999),
             ),
-            child: RichText(
-              text: TextSpan(
-                style: TextStyle(fontFamily: AppFonts.display, fontSize: 17, color: on ? t.bg : t.ink),
-                children: [
-                  TextSpan(text: '$v'),
-                  TextSpan(
-                    text: ' min',
-                    style: TextStyle(fontFamily: AppFonts.mono, fontSize: 9, color: (on ? t.bg : t.ink).withValues(alpha: 0.6)),
+            child: isCustom
+                ? RichText(
+                    text: TextSpan(
+                      style: TextStyle(fontFamily: AppFonts.display, fontSize: 17, color: t.bg),
+                      children: [
+                        TextSpan(text: '$selected'),
+                        TextSpan(
+                          text: ' min',
+                          style: TextStyle(fontFamily: AppFonts.mono, fontSize: 9, color: t.bg.withValues(alpha: 0.6)),
+                        ),
+                      ],
+                    ),
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.add_rounded, size: 14, color: t.ink2),
+                      const SizedBox(width: 3),
+                      Text('Custom', style: TextStyle(fontFamily: AppFonts.ui, fontSize: 13, color: t.ink2, fontWeight: FontWeight.w500)),
+                    ],
                   ),
-                ],
-              ),
-            ),
           ),
-        );
-      }).toList(),
+        ),
+      ],
     );
   }
 }
 
-// ── Sessions dots picker ──────────────────────────────────────────────────────
+// ── Sessions picker ───────────────────────────────────────────────────────────
 
-class _SessionDots extends StatelessWidget {
-  const _SessionDots({required this.t, required this.settings});
+class _SessionPicker extends StatelessWidget {
+  const _SessionPicker({required this.t, required this.settings});
   final AppTokens t;
   final SettingsController settings;
 
   @override
   Widget build(BuildContext context) {
-    const maxSessions = 6;
+    const maxSessions = 8;
     final selected = settings.sessionsBeforeLongBreak;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       decoration: BoxDecoration(
         color: t.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: t.border),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Row(
-              children: List.generate(maxSessions, (i) {
-                final filled = i < selected;
-                return GestureDetector(
-                  onTap: () => settings.sessionsBeforeLongBreak = i + 1,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: filled ? t.pop : t.surface2,
-                        border: Border.all(color: filled ? t.popDeep : t.border, width: 1.5),
+          Row(
+            children: [
+              Expanded(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: List.generate(maxSessions, (i) {
+                    final n = i + 1;
+                    final on = n == selected;
+                    return GestureDetector(
+                      onTap: () => settings.sessionsBeforeLongBreak = n,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: on ? t.pop : t.surface2,
+                          border: Border.all(color: on ? t.popDeep : t.border, width: on ? 2 : 1.5),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '$n',
+                            style: TextStyle(
+                              fontFamily: AppFonts.display,
+                              fontSize: 15,
+                              color: on ? t.ink : t.ink3,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                );
-              }),
-            ),
+                    );
+                  }),
+                ),
+              ),
+            ],
           ),
-          Text(
-            '$selected',
-            style: TextStyle(fontFamily: AppFonts.mono, fontSize: 16, color: t.ink, fontWeight: FontWeight.w600),
+          const SizedBox(height: 10),
+          // Explanation row
+          Row(
+            children: [
+              Icon(Icons.repeat_rounded, size: 12, color: t.ink3),
+              const SizedBox(width: 5),
+              Text(
+                '$selected ${selected == 1 ? 'session' : 'sessions'}, then a ${settings.longBreakMinutes}m long break',
+                style: TextStyle(fontFamily: AppFonts.mono, fontSize: 10, color: t.ink3, letterSpacing: 0.05),
+              ),
+            ],
           ),
         ],
       ),
