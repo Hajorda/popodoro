@@ -6,6 +6,7 @@ import '../../core/theme/app_typography.dart';
 import '../../services/together_service.dart';
 import '../../widgets/mascot/pop_mascot.dart';
 import '../../widgets/together/buddy_avatar.dart';
+import 'create_room_screen.dart';
 
 class CompleteScreen extends StatelessWidget {
   const CompleteScreen({super.key});
@@ -19,28 +20,34 @@ class CompleteScreen extends StatelessWidget {
         final room = together.room;
         final participants = together.participants;
 
-        // Reactions received by me
         final myReactions = together.recentReactions
             .where((r) => r.toUserId == together.myUserId)
             .toList();
+
+        final focusMins = room?.durationMinutes ?? 25;
+        final focusLabel = focusMins >= 60
+            ? '${focusMins ~/ 60}h ${focusMins % 60 > 0 ? "${focusMins % 60}m" : ""}'
+            : '${focusMins}m';
 
         return Scaffold(
           backgroundColor: t.bg,
           body: SafeArea(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // ── Sage header ──────────────────────────────────────────────
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  padding: const EdgeInsets.symmetric(vertical: 13),
                   color: t.sage.withValues(alpha: 0.14),
                   child: Text(
-                    'SESSION COMPLETE · ${room?.durationMinutes ?? 25} MIN',
+                    'SESSION COMPLETE · $focusLabel',
                     style: TextStyle(
                       fontFamily: AppFonts.mono,
                       fontSize: 11,
                       color: t.sage,
                       letterSpacing: 0.14,
+                      fontWeight: FontWeight.w600,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -48,73 +55,65 @@ class CompleteScreen extends StatelessWidget {
 
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
                     child: Column(
                       children: [
+                        const Spacer2(height: 32),
+
                         // Hero copy
                         Text(
                           'you all popped.',
                           style: TextStyle(
                             fontFamily: AppFonts.display,
-                            fontSize: 36,
+                            fontSize: 38,
                             color: t.ink,
                             fontStyle: FontStyle.italic,
+                            height: 1.0,
                           ),
                           textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 32),
+                        if (room?.taskName != null) ...[
+                          const Spacer2(height: 8),
+                          Text(
+                            room!.taskName!,
+                            style: TextStyle(
+                              fontFamily: AppFonts.display,
+                              fontSize: 16,
+                              color: t.ink3,
+                              fontStyle: FontStyle.italic,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
 
-                        // Mascot trio
-                        _MascotTrio(t: t, participants: participants, myUserId: together.myUserId),
+                        const Spacer2(height: 32),
 
-                        const SizedBox(height: 32),
+                        // Mascot trio (left buddy · center you · right buddy)
+                        _MascotTrio(
+                          t: t,
+                          participants: participants,
+                          myUserId: together.myUserId,
+                        ),
+
+                        const Spacer2(height: 28),
 
                         // Stats grid
                         _StatsGrid(
                           t: t,
-                          durationMinutes: room?.durationMinutes ?? 25,
+                          focusLabel: focusLabel,
                           count: participants.length,
                         ),
 
                         // Reactions received
                         if (myReactions.isNotEmpty) ...[
-                          const SizedBox(height: 24),
+                          const Spacer2(height: 16),
                           _ReactionsCard(t: t, reactions: myReactions),
                         ],
 
-                        const SizedBox(height: 32),
+                        const Spacer2(height: 32),
 
-                        // Buttons
-                        SizedBox(
-                          width: double.infinity,
-                          child: GestureDetector(
-                            onTap: () async {
-                              await together.leaveRoom();
-                              if (context.mounted) {
-                                Navigator.of(context)
-                                    .popUntil((r) => r.isFirst);
-                              }
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 18),
-                              decoration: BoxDecoration(
-                                color: t.surface,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: t.border),
-                              ),
-                              child: Text(
-                                'End session',
-                                style: TextStyle(
-                                  fontFamily: AppFonts.ui,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                  color: t.ink2,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ),
-                        ),
+                        // CTA buttons
+                        _CTAButtons(t: t, together: together),
                       ],
                     ),
                   ),
@@ -126,6 +125,16 @@ class CompleteScreen extends StatelessWidget {
       },
     );
   }
+}
+
+// ── Spacer helper (avoids Spacer inside SingleChildScrollView) ────────────────
+
+class Spacer2 extends StatelessWidget {
+  const Spacer2({super.key, required this.height});
+  final double height;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(height: height);
 }
 
 // ── Mascot trio ───────────────────────────────────────────────────────────────
@@ -141,16 +150,14 @@ class _MascotTrio extends StatelessWidget {
   final List<TogetherParticipant> participants;
   final String? myUserId;
 
+  static const _sideColors = [Color(0xFF9A8FE8), Color(0xFFF26B4F)]; // lavender, ember
+
   @override
   Widget build(BuildContext context) {
-    // Pick up to 3 participants; put "me" in the center
     final me = participants.where((p) => p.userId == myUserId).firstOrNull;
     final others = participants.where((p) => p.userId != myUserId).toList();
-
     final left = others.isNotEmpty ? others.first : null;
     final right = others.length > 1 ? others[1] : null;
-
-    final colors = [t.lavender, t.pop, t.ember];
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -159,29 +166,28 @@ class _MascotTrio extends StatelessWidget {
         if (left != null) ...[
           _MascotTile(
             t: t,
-            displayName: left.displayName,
+            label: left.displayName,
             size: 68,
-            ringColor: colors[0],
-            mood: PopMood.celebrating,
+            ringColor: _sideColors[0],
           ),
           const SizedBox(width: 8),
         ],
-        // Center (me) — slightly bigger
+        // Center — slightly bigger, always "you"
         _MascotTile(
           t: t,
-          displayName: me != null ? 'you' : (participants.isNotEmpty ? participants.first.displayName : 'you'),
+          label: me != null
+              ? 'you'
+              : (participants.isNotEmpty ? participants.first.displayName : 'you'),
           size: 92,
           ringColor: t.sage,
-          mood: PopMood.celebrating,
         ),
         if (right != null) ...[
           const SizedBox(width: 8),
           _MascotTile(
             t: t,
-            displayName: right.displayName,
+            label: right.displayName,
             size: 68,
-            ringColor: colors[2],
-            mood: PopMood.celebrating,
+            ringColor: _sideColors[1],
           ),
         ],
       ],
@@ -192,17 +198,15 @@ class _MascotTrio extends StatelessWidget {
 class _MascotTile extends StatelessWidget {
   const _MascotTile({
     required this.t,
-    required this.displayName,
+    required this.label,
     required this.size,
     required this.ringColor,
-    required this.mood,
   });
 
   final AppTokens t;
-  final String displayName;
+  final String label;
   final double size;
   final Color ringColor;
-  final PopMood mood;
 
   @override
   Widget build(BuildContext context) {
@@ -210,8 +214,8 @@ class _MascotTile extends StatelessWidget {
       t: t,
       size: size,
       ringColor: ringColor,
-      mood: mood,
-      label: displayName,
+      mood: PopMood.celebrating,
+      label: label,
     );
   }
 }
@@ -221,12 +225,12 @@ class _MascotTile extends StatelessWidget {
 class _StatsGrid extends StatelessWidget {
   const _StatsGrid({
     required this.t,
-    required this.durationMinutes,
+    required this.focusLabel,
     required this.count,
   });
 
   final AppTokens t;
-  final int durationMinutes;
+  final String focusLabel;
   final int count;
 
   @override
@@ -235,28 +239,24 @@ class _StatsGrid extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: t.dim,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _Stat(
-            t: t,
-            value: '${durationMinutes ~/ 60 > 0 ? "${durationMinutes ~/ 60}h" : ""}${durationMinutes % 60 > 0 ? "${durationMinutes % 60}m" : ""}',
-            label: 'focused',
-          ),
-          Container(width: 1, height: 28, color: t.border),
-          _Stat(t: t, value: count.toString(), label: 'together'),
-          Container(width: 1, height: 28, color: t.border),
-          _Stat(t: t, value: '🎉', label: 'popped!'),
+          _StatCell(t: t, value: focusLabel, label: 'focused'),
+          Container(width: 1, height: 32, color: t.border),
+          _StatCell(t: t, value: '$count', label: 'together'),
+          Container(width: 1, height: 32, color: t.border),
+          _StatCell(t: t, value: '🎉', label: 'popped!'),
         ],
       ),
     );
   }
 }
 
-class _Stat extends StatelessWidget {
-  const _Stat({required this.t, required this.value, required this.label});
+class _StatCell extends StatelessWidget {
+  const _StatCell({required this.t, required this.value, required this.label});
   final AppTokens t;
   final String value;
   final String label;
@@ -264,6 +264,7 @@ class _Stat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           value,
@@ -289,21 +290,22 @@ class _Stat extends StatelessWidget {
   }
 }
 
-// ── Reactions card ────────────────────────────────────────────────────────────
+// ── Reactions received card ───────────────────────────────────────────────────
 
 class _ReactionsCard extends StatelessWidget {
   const _ReactionsCard({required this.t, required this.reactions});
   final AppTokens t;
-  final List<dynamic> reactions;
+  final List<TogetherReaction> reactions;
 
   @override
   Widget build(BuildContext context) {
-    final emojiCounts = <String, int>{};
+    final counts = <String, int>{};
     for (final r in reactions) {
-      emojiCounts[r.emoji as String] = (emojiCounts[r.emoji as String] ?? 0) + 1;
+      counts[r.emoji] = (counts[r.emoji] ?? 0) + 1;
     }
 
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: t.surface,
@@ -326,18 +328,18 @@ class _ReactionsCard extends StatelessWidget {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: emojiCounts.entries.map((e) {
+            children: counts.entries.map((e) {
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                 decoration: BoxDecoration(
                   color: t.dim,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  '${e.key} ${e.value}',
+                  '${e.key}  ${e.value}',
                   style: TextStyle(
                     fontFamily: AppFonts.ui,
-                    fontSize: 14,
+                    fontSize: 15,
                     color: t.ink,
                   ),
                 ),
@@ -346,6 +348,85 @@ class _ReactionsCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── CTA buttons ───────────────────────────────────────────────────────────────
+
+class _CTAButtons extends StatelessWidget {
+  const _CTAButtons({required this.t, required this.together});
+  final AppTokens t;
+  final TogetherService together;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // "Pop another?" — creates a fresh room
+        SizedBox(
+          width: double.infinity,
+          child: GestureDetector(
+            onTap: () async {
+              await together.leaveRoom();
+              if (context.mounted) {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute<void>(
+                      builder: (_) => const CreateRoomScreen()),
+                );
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 17),
+              decoration: BoxDecoration(
+                color: t.pop,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                'Pop another? →',
+                style: TextStyle(
+                  fontFamily: AppFonts.ui,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: t.ink,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        // "End session"
+        SizedBox(
+          width: double.infinity,
+          child: GestureDetector(
+            onTap: () async {
+              await together.leaveRoom();
+              if (context.mounted) {
+                Navigator.of(context).popUntil((r) => r.isFirst);
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 17),
+              decoration: BoxDecoration(
+                color: t.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: t.border),
+              ),
+              child: Text(
+                'End session',
+                style: TextStyle(
+                  fontFamily: AppFonts.ui,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: t.ink2,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

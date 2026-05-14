@@ -11,6 +11,8 @@ class TogetherRoom {
     required this.durationMinutes,
     required this.status,
     this.startedAt,
+    this.breakMinutes = 5,
+    this.breakStartedAt,
   });
 
   final String id;
@@ -18,8 +20,15 @@ class TogetherRoom {
   final String hostId;
   final String? taskName;
   final int durationMinutes;
-  final String status; // lobby | active | complete
+  final String status; // lobby | active | break | complete
   final DateTime? startedAt;
+  final int breakMinutes;
+  final DateTime? breakStartedAt;
+
+  bool get isLobby => status == 'lobby';
+  bool get isFocusing => status == 'active';
+  bool get isOnBreak => status == 'break';
+  bool get isComplete => status == 'complete';
 
   factory TogetherRoom.fromMap(Map<String, dynamic> m) => TogetherRoom(
         id: m['id'] as String,
@@ -31,9 +40,14 @@ class TogetherRoom {
         startedAt: m['started_at'] != null
             ? DateTime.parse(m['started_at'] as String).toLocal()
             : null,
+        breakMinutes: (m['break_minutes'] as int?) ?? 5,
+        breakStartedAt: m['break_started_at'] != null
+            ? DateTime.parse(m['break_started_at'] as String).toLocal()
+            : null,
       );
 
-  TogetherRoom copyWith({String? status, DateTime? startedAt}) => TogetherRoom(
+  TogetherRoom copyWith({String? status, DateTime? startedAt, DateTime? breakStartedAt}) =>
+      TogetherRoom(
         id: id,
         code: code,
         hostId: hostId,
@@ -41,6 +55,8 @@ class TogetherRoom {
         durationMinutes: durationMinutes,
         status: status ?? this.status,
         startedAt: startedAt ?? this.startedAt,
+        breakMinutes: breakMinutes,
+        breakStartedAt: breakStartedAt ?? this.breakStartedAt,
       );
 
   Duration get remaining {
@@ -57,6 +73,35 @@ class TogetherRoom {
     final total = durationMinutes * 60;
     return (elapsed / total).clamp(0.0, 1.0);
   }
+
+  Duration get breakRemaining {
+    if (breakStartedAt == null) return Duration(minutes: breakMinutes);
+    final elapsed = DateTime.now().difference(breakStartedAt!);
+    final total = Duration(minutes: breakMinutes);
+    final left = total - elapsed;
+    return left.isNegative ? Duration.zero : left;
+  }
+
+  double get breakProgress {
+    if (breakStartedAt == null) return 0;
+    final elapsed = DateTime.now().difference(breakStartedAt!).inSeconds;
+    final total = breakMinutes * 60;
+    return (elapsed / total).clamp(0.0, 1.0);
+  }
+
+  String _fmt(Duration d) {
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  String get timeDisplay => isFocusing || isLobby
+      ? _fmt(remaining)
+      : isOnBreak
+          ? _fmt(breakRemaining)
+          : '00:00';
+
+  double get currentProgress => isFocusing ? progress : isOnBreak ? breakProgress : 1.0;
 }
 
 class TogetherParticipant {
@@ -147,7 +192,11 @@ class TogetherService extends ChangeNotifier {
 
   // ── Public API ────────────────────────────────────────────────────────────────
 
-  Future<bool> createRoom({String? taskName, int durationMinutes = 25}) =>
+  Future<bool> createRoom({
+    String? taskName,
+    int durationMinutes = 25,
+    int breakMinutes = 5,
+  }) =>
       _run(() async {
         final userId = _client.auth.currentUser!.id;
         final code = _generateCode();
@@ -157,6 +206,7 @@ class TogetherService extends ChangeNotifier {
           'code': code,
           if (taskName != null && taskName.isNotEmpty) 'task_name': taskName,
           'duration_minutes': durationMinutes,
+          'break_minutes': breakMinutes,
           'status': 'lobby',
         }).select().single();
 
@@ -218,6 +268,25 @@ class TogetherService extends ChangeNotifier {
         .eq('room_id', _room!.id);
   }
 
+  /// Host → transitions room from active → break.
+  Future<void> startBreak() async {
+    if (_room == null || !isHost) return;
+    final now = DateTime.now().toUtc().toIso8601String();
+    await _client
+        .from('rooms')
+        .update({'status': 'break', 'break_started_at': now})
+        .eq('id', _room!.id);
+  }
+
+  /// Host → marks the session as complete.
+  Future<void> endSession() async {
+    if (_room == null || !isHost) return;
+    await _client
+        .from('rooms')
+        .update({'status': 'complete'})
+        .eq('id', _room!.id);
+  }
+
   Future<void> sendReaction(String emoji, String toUserId) async {
     if (_room == null || myUserId == null) return;
     try {
@@ -231,27 +300,6 @@ class TogetherService extends ChangeNotifier {
     } catch (e) {
       debugPrint('[TogetherService] reaction error: $e');
     }
-  }
-
-  Future<void> completeSession() async {
-    if (_room == null || myUserId == null) return;
-    try {
-      await _client
-          .from('room_participants')
-          .update({'status': 'done'})
-          .eq('room_id', _room!.id)
-          .eq('user_id', myUserId!);
-      if (isHost) {
-        await _client
-            .from('rooms')
-            .update({'status': 'complete'})
-            .eq('id', _room!.id);
-      }
-    } catch (e) {
-      debugPrint('[TogetherService] complete error: $e');
-    }
-    _room = _room!.copyWith(status: 'complete');
-    notifyListeners();
   }
 
   Future<void> leaveRoom() async {

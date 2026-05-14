@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../controllers/settings_controller.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/theme/app_typography.dart';
 import '../../services/together_service.dart';
@@ -26,11 +27,13 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
 
   Future<void> _startRoom() async {
     final together = context.read<TogetherService>();
+    final breakMins = context.read<SettingsController>().shortBreakMinutes;
     final ok = await together.createRoom(
       taskName: _taskController.text.trim().isEmpty
           ? null
           : _taskController.text.trim(),
       durationMinutes: _durationMinutes,
+      breakMinutes: breakMins,
     );
 
     if (!mounted) return;
