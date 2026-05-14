@@ -40,6 +40,34 @@ class FocusGuardService extends ChangeNotifier {
   })  : _settings = settings,
         _db = db {
     _settings.addListener(_onSettingsChanged);
+    // Auto-load model on startup if guard is already enabled (no camera dialog needed).
+    if (_settings.focusGuardEnabled) {
+      unawaited(_silentInit());
+    }
+  }
+
+  bool _initializing = false;
+
+  // Loads the model + opens the camera session silently (no permission dialog).
+  // Safe to call when permission was already granted in a previous session.
+  Future<void> _silentInit() async {
+    if (_initializing || _interpreter != null) return;
+    _initializing = true;
+    try {
+      await _loadModel();
+      if (_interpreter != null && !kIsWeb && Platform.isMacOS) {
+        // Check permission without requesting — only open session if already granted.
+        final status = await _channel.invokeMethod<String>('requestPermission');
+        if (status == 'granted') {
+          _lastCameraFailure = null;
+          _onTimerChanged(); // re-evaluate now that model is ready
+        }
+      } else if (_interpreter != null) {
+        _onTimerChanged();
+      }
+    } catch (_) {} finally {
+      _initializing = false;
+    }
   }
 
   final SettingsController _settings;
@@ -291,6 +319,11 @@ class FocusGuardService extends ChangeNotifier {
 
     final isFocusRunning = timer.phase == TimerPhase.focus &&
         timer.status == TimerStatus.running;
+
+    if (isFocusRunning && _interpreter == null) {
+      // Model not loaded yet — try silent init (handles the relaunch-with-guard case).
+      unawaited(_silentInit());
+    }
 
     if (isFocusRunning && _interpreter != null) {
       final newSessionId =
