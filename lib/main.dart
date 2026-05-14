@@ -13,6 +13,7 @@ import 'services/auth_service.dart';
 import 'services/desktop_tray_service.dart';
 import 'services/sound_service.dart';
 import 'services/sync_service.dart';
+import 'services/together_service.dart';
 import 'services/window_service.dart';
 
 const _supabaseUrl = 'https://ysbbdxvwittczfrezzlm.supabase.co';
@@ -80,6 +81,9 @@ class PopodoroApp extends StatelessWidget {
         ChangeNotifierProvider<WindowService>(
           create: (ctx) =>
               WindowService(prefs: ctx.read<SettingsController>().prefs),
+        ),
+        ChangeNotifierProvider<TogetherService>(
+          create: (_) => TogetherService(),
         ),
         Provider<SoundService>(
           create: (ctx) => SoundService(ctx.read<SettingsController>()),
