@@ -171,7 +171,7 @@ class _BreakContent extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
               ],
-              if (isIdle)
+              if (isIdle) ...[
                 PopButton(
                   label: 'Start break',
                   variant: PopButtonVariant.primary,
@@ -185,6 +185,22 @@ class _BreakContent extends StatelessWidget {
                   borderColor: t.border,
                   ink2Color: t.ink2,
                 ),
+                const SizedBox(width: 10),
+                PopButton(
+                  label: 'Skip →',
+                  variant: PopButtonVariant.ghost,
+                  small: true,
+                  onPressed: () {
+                    context.read<SoundService>().playSwitch();
+                    timer.skipPhase();
+                  },
+                  inkColor: t.ink,
+                  bgColor: t.bg,
+                  surfaceColor: t.surface,
+                  borderColor: t.border,
+                  ink2Color: t.ink2,
+                ),
+              ],
               if (isRunning || isPaused)
                 PopButton(
                   label: 'Skip break →',

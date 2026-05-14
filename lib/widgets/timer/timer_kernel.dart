@@ -1,11 +1,12 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_typography.dart';
 import '../mascot/pop_mascot.dart';
 
-// Timer variant: Pop mascot fills bottom-up with accent color as progress grows.
-// Time displayed in a floating badge at the bottom of the mascot.
-class TimerKernel extends StatelessWidget {
+class TimerKernel extends StatefulWidget {
   const TimerKernel({
     super.key,
     required this.progress,
@@ -38,62 +39,103 @@ class TimerKernel extends StatelessWidget {
   static const double _mascotSize = 200;
 
   @override
+  State<TimerKernel> createState() => _TimerKernelState();
+}
+
+class _TimerKernelState extends State<TimerKernel> {
+  static final _rng = math.Random();
+
+  bool _eyesClosed = false;
+  Timer? _blinkTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _scheduleBlink();
+  }
+
+  void _scheduleBlink() {
+    // Random interval 3–7 s so it feels natural, not mechanical
+    final delay = Duration(milliseconds: 3000 + _rng.nextInt(4000));
+    _blinkTimer = Timer(delay, () {
+      if (!mounted) return;
+      setState(() => _eyesClosed = true);
+      Timer(const Duration(milliseconds: 110), () {
+        if (!mounted) return;
+        setState(() => _eyesClosed = false);
+        _scheduleBlink();
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _blinkTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final pct = (progress * 100).round();
+    final pct = (widget.progress * 100).round();
+    const mascotSize = TimerKernel._mascotSize;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          sessionLabel,
+          widget.sessionLabel,
           style: TextStyle(
             fontFamily: AppFonts.mono,
             fontSize: 10,
-            color: ink3Color,
+            color: widget.ink3Color,
             letterSpacing: 0.14,
           ),
         ),
         const SizedBox(height: 20),
         SizedBox(
-          width: _mascotSize,
-          height: _mascotSize + 18, // extra for badge overflow
+          width: mascotSize,
+          height: mascotSize + 18,
           child: Stack(
             clipBehavior: Clip.none,
             alignment: Alignment.topCenter,
             children: [
-              // Base mascot — muted (surface2) accent
+              // Base mascot
               PopMascot(
-                size: _mascotSize,
+                size: mascotSize,
                 mood: PopMood.focused,
-                accentColor: baseColor,
-                bumpColor: bumpColor,
-                bumpEdgeColor: bumpEdgeColor,
-                inkColor: inkColor,
+                eyesClosed: _eyesClosed,
+                accentColor: widget.baseColor,
+                bumpColor: widget.bumpColor,
+                bumpEdgeColor: widget.bumpEdgeColor,
+                inkColor: widget.inkColor,
               ),
-              // Filled overlay — clipped from the bottom up
+              // Fill overlay clipped bottom-up
               ClipRect(
-                clipper: _BottomFillClipper(progress: progress.clamp(0.0, 1.0)),
+                clipper: _BottomFillClipper(
+                    progress: widget.progress.clamp(0.0, 1.0)),
                 child: PopMascot(
-                  size: _mascotSize,
+                  size: mascotSize,
                   mood: PopMood.focused,
-                  accentColor: activeColor,
-                  bumpColor: bumpColor,
-                  bumpEdgeColor: bumpEdgeColor,
-                  inkColor: inkColor,
+                  eyesClosed: _eyesClosed,
+                  accentColor: widget.activeColor,
+                  bumpColor: widget.bumpColor,
+                  bumpEdgeColor: widget.bumpEdgeColor,
+                  inkColor: widget.inkColor,
                 ),
               ),
-              // Time badge overlaid at the bottom
+              // Time badge
               Positioned(
                 bottom: 0,
                 left: 0,
                 right: 0,
                 child: Center(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 4),
                     decoration: BoxDecoration(
-                      color: surfaceColor,
+                      color: widget.surfaceColor,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: borderColor),
+                      border: Border.all(color: widget.borderColor),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.06),
@@ -103,11 +145,11 @@ class TimerKernel extends StatelessWidget {
                       ],
                     ),
                     child: Text(
-                      timeDisplay,
+                      widget.timeDisplay,
                       style: TextStyle(
                         fontFamily: AppFonts.display,
                         fontSize: 36,
-                        color: inkColor,
+                        color: widget.inkColor,
                         letterSpacing: -1,
                         height: 1.0,
                       ),
@@ -124,7 +166,7 @@ class TimerKernel extends StatelessWidget {
           style: TextStyle(
             fontFamily: AppFonts.display,
             fontSize: 18,
-            color: ink2Color,
+            color: widget.ink2Color,
             fontStyle: FontStyle.italic,
           ),
         ),

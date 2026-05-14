@@ -223,11 +223,12 @@ class FocusGuardService extends ChangeNotifier {
       );
       _interpreter!.allocateTensors();
 
-      // Auto-detect input size from input tensor [1, H, W, C] or [1, size, size, C].
-      final inShape = _interpreter!.getInputTensor(0).shape;
-      debugPrint('[FocusGuard] input shape: $inShape');
+      // Auto-detect input size and type.
+      final inTensor = _interpreter!.getInputTensor(0);
+      final inShape = inTensor.shape;
+      debugPrint('[FocusGuard] input shape: $inShape  type: ${inTensor.type}');
       if (inShape.length == 4 && inShape[1] > 0) {
-        _inputSize = inShape[1]; // use H dimension
+        _inputSize = inShape[1];
       }
 
       final outShape = _interpreter!.getOutputTensor(0).shape;
@@ -415,29 +416,37 @@ class FocusGuardService extends ChangeNotifier {
       final sz = _inputSize;
       final resized = img.copyResize(decoded, width: sz, height: sz);
 
-      final inputBytes = Uint8List(sz * sz * 3);
+      // Float32 input: hybrid int8 models have float32 I/O (int8 weights only).
+      // Values in [0, 255] — normalization is baked into the model graph.
+      final inputFloat = Float32List(sz * sz * 3);
       var idx = 0;
       for (var y = 0; y < sz; y++) {
         for (var x = 0; x < sz; x++) {
           final pixel = resized.getPixel(x, y);
-          inputBytes[idx++] = pixel.r.toInt().clamp(0, 255);
-          inputBytes[idx++] = pixel.g.toInt().clamp(0, 255);
-          inputBytes[idx++] = pixel.b.toInt().clamp(0, 255);
+          inputFloat[idx++] = pixel.r.toDouble();
+          inputFloat[idx++] = pixel.g.toDouble();
+          inputFloat[idx++] = pixel.b.toDouble();
         }
       }
 
-      final interpreter = _interpreter!;
-      interpreter.getInputTensor(0).data = inputBytes;
-      interpreter.invoke();
-      final rawOut = interpreter.getOutputTensor(0).data.buffer.asFloat32List();
+      // Use .data= + .invoke() directly to preserve the 4D tensor shape
+      // set by allocateTensors(). interpreter.run() internally resizes to 1D
+      // which breaks the PAD op (SizeOfDimension 4 != 1).
+      _interpreter!.getInputTensor(0).data = inputFloat.buffer.asUint8List();
+      _interpreter!.invoke();
 
-      return _parseOutput(rawOut);
+      // Output bytes reinterpreted as float32 (row-major, same layout as tensor)
+      final raw = _interpreter!.getOutputTensor(0).data.buffer.asFloat32List();
+      return _parseOutput(raw);
     } catch (e) {
       debugPrint('[FocusGuard] inference error: $e');
       return const _DetectionResult(true, false);
     }
   }
 
+  // Flat row-major array from TFLite tensor copy:
+  //   transposed [1, anchors, features] → raw[a * features + f]
+  //   standard   [1, features, anchors] → raw[f * anchors + a]
   _DetectionResult _parseOutput(Float32List raw) {
     bool personFound = false;
     bool phoneFound = false;
@@ -445,31 +454,24 @@ class FocusGuardService extends ChangeNotifier {
     final numClasses = _numFeatures - 4;
     if (numClasses <= 0) return const _DetectionResult(true, false);
 
-    final personIdx = _kPersonClass;
-    final phoneIdx = _kPhoneClass;
-
-    if (!_transposedOutput) {
+    if (_transposedOutput) {
       for (var a = 0; a < _numAnchors; a++) {
-        if (personIdx < numClasses) {
-          final score = raw[(4 + personIdx) * _numAnchors + a];
-          if (score > _kConfidenceThreshold) { personFound = true; }
+        final base = a * _numFeatures;
+        if (_kPersonClass < numClasses) {
+          if (raw[base + 4 + _kPersonClass] > _kConfidenceThreshold) personFound = true;
         }
-        if (phoneIdx < numClasses) {
-          final score = raw[(4 + phoneIdx) * _numAnchors + a];
-          if (score > _kConfidenceThreshold) { phoneFound = true; }
+        if (_kPhoneClass < numClasses) {
+          if (raw[base + 4 + _kPhoneClass] > _kConfidenceThreshold) phoneFound = true;
         }
         if (personFound && phoneFound) break;
       }
     } else {
       for (var a = 0; a < _numAnchors; a++) {
-        final base = a * _numFeatures;
-        if (personIdx < numClasses) {
-          final score = raw[base + 4 + personIdx];
-          if (score > _kConfidenceThreshold) { personFound = true; }
+        if (_kPersonClass < numClasses) {
+          if (raw[(4 + _kPersonClass) * _numAnchors + a] > _kConfidenceThreshold) personFound = true;
         }
-        if (phoneIdx < numClasses) {
-          final score = raw[base + 4 + phoneIdx];
-          if (score > _kConfidenceThreshold) { phoneFound = true; }
+        if (_kPhoneClass < numClasses) {
+          if (raw[(4 + _kPhoneClass) * _numAnchors + a] > _kConfidenceThreshold) phoneFound = true;
         }
         if (personFound && phoneFound) break;
       }

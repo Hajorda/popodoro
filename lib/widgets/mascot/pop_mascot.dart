@@ -11,6 +11,7 @@ class PopMascot extends StatelessWidget {
     super.key,
     this.size = 120,
     this.mood = PopMood.hi,
+    this.eyesClosed = false,
     required this.accentColor,
     required this.bumpColor,
     required this.bumpEdgeColor,
@@ -19,6 +20,7 @@ class PopMascot extends StatelessWidget {
 
   final double size;
   final PopMood mood;
+  final bool eyesClosed;
   final Color accentColor;
   final Color bumpColor;
   final Color bumpEdgeColor;
@@ -40,6 +42,7 @@ class PopMascot extends StatelessWidget {
               bumpEdgeColor: bumpEdgeColor,
               inkColor: inkColor,
               mood: mood,
+              eyesClosed: eyesClosed,
             ),
           ),
           // Sleepy 'z' — rendered as a widget so it uses the real font
@@ -72,6 +75,7 @@ class _PopPainter extends CustomPainter {
     required this.bumpEdgeColor,
     required this.inkColor,
     required this.mood,
+    this.eyesClosed = false,
   });
 
   final Color accentColor;
@@ -79,6 +83,7 @@ class _PopPainter extends CustomPainter {
   final Color bumpEdgeColor;
   final Color inkColor;
   final PopMood mood;
+  final bool eyesClosed;
 
   @override
   void paint(Canvas canvas, Size s) {
@@ -219,6 +224,18 @@ class _PopPainter extends CustomPainter {
 
   void _drawEyes(Canvas canvas, Size s) {
     final ink = Paint()..color = inkColor;
+
+    if (eyesClosed) {
+      // Blink: thin closed arc (same as resting but shorter/thinner)
+      final arc = Paint()
+        ..color = inkColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = s.width * 0.028
+        ..strokeCap = StrokeCap.round;
+      canvas.drawArc(Rect.fromLTWH(s.width * 0.30, s.height * 0.52, s.width * 0.10, s.height * 0.035), math.pi, -math.pi, false, arc);
+      canvas.drawArc(Rect.fromLTWH(s.width * 0.60, s.height * 0.52, s.width * 0.10, s.height * 0.035), math.pi, -math.pi, false, arc);
+      return;
+    }
 
     switch (mood) {
       case PopMood.resting:
@@ -377,6 +394,7 @@ class _PopPainter extends CustomPainter {
   @override
   bool shouldRepaint(_PopPainter old) =>
       old.mood != mood ||
+      old.eyesClosed != eyesClosed ||
       old.accentColor != accentColor ||
       old.inkColor != inkColor;
 }
