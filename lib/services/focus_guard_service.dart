@@ -22,10 +22,10 @@ enum GuardStatus { idle, active, noPersonDetected, phoneDetected, cameraError }
 
 enum CameraFailure { permissionDenied, noCamera, notSupported, other }
 
-// Class indices for yolo26n (2-class model: phone=0, person=1).
-// Phone class disabled: too noisy (0.52–0.71 false positives), only track presence.
-const _kPersonClass = 1;
-const _kPhoneClass = 99; // intentionally exceeds numClasses — disables phone detection
+// yolo26n float32 output: class0 (index 4) is person confidence (already a probability,
+// values observed: 0.93 with person, 0.01 empty). class1 (index 5) is noise/unused.
+const _kPersonClass = 0;
+const _kPhoneClass = 99; // disabled — class1 output is not reliable
 const _kConfidenceThreshold = 0.65;
 
 // Method channel for native macOS camera — matches FocusGuardPlugin.swift
@@ -236,8 +236,9 @@ class FocusGuardService extends ChangeNotifier {
         _inputSize = inShape[1];
       }
 
-      final outShape = _interpreter!.getOutputTensor(0).shape;
-      debugPrint('[FocusGuard] output shape: $outShape');
+      final outTensor = _interpreter!.getOutputTensor(0);
+      final outShape = outTensor.shape;
+      debugPrint('[FocusGuard] output shape: $outShape  type: ${outTensor.type}');
       if (outShape.length == 3) {
         if (outShape[1] > outShape[2]) {
           _transposedOutput = true;
@@ -443,7 +444,11 @@ class FocusGuardService extends ChangeNotifier {
       _interpreter!.getInputTensor(0).data = inputFloat.buffer.asUint8List();
       _interpreter!.invoke();
 
-      final raw = _interpreter!.getOutputTensor(0).data.buffer.asFloat32List();
+      final outTensorData = _interpreter!.getOutputTensor(0).data;
+      final raw = outTensorData.buffer.asFloat32List();
+      // Log first 12 floats (2 full anchors) to see if values vary between frames
+      final preview = raw.take(12).map((v) => v.toStringAsFixed(2)).join(', ');
+      debugPrint('[FocusGuard] raw[0..11]: [$preview]');
       return _parseOutput(raw);
     } catch (e) {
       debugPrint('[FocusGuard] inference error: $e');
