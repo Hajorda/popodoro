@@ -44,16 +44,27 @@ jobs:
       - name: Build macOS (release)
         run: flutter build macos --release
 
-      - name: Zip .app bundle
+      - name: Package macOS DMG
         run: |
-          cd build/macos/Build/Products/Release
-          zip -r "$GITHUB_WORKSPACE/popodoro-macos.zip" popodoro.app
+          # Copy the built Popodoro.app to the exports/Runner folder expected by appdmg
+          mkdir -p exports/Runner
+          cp -r build/macos/Build/Products/Release/popodoro.app exports/Runner/Popodoro.app
+          
+          # Install Node and appdmg
+          npm install -g appdmg
+
+          # Build the .dmg
+          cd exports/dmg
+          bash build.sh
+          
+          # Move the .dmg up to the workspace root for the artifact upload
+          mv Popodoro.dmg $GITHUB_WORKSPACE/popodoro-macos.dmg
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: popodoro-macos
-          path: popodoro-macos.zip
+          path: popodoro-macos.dmg
           retention-days: 14
 
   # ── Windows ───────────────────────────────────────────────────────────────────
@@ -138,7 +149,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            popodoro-macos.zip
+            popodoro-macos.dmg
             popodoro-*-windows-installer.exe
           generate_release_notes: true
 
@@ -158,7 +169,7 @@ jobs:
           
           # Extract the Windows filename from needs/upload-artifact or predictably format it
           # Easiest is to format the URLs reliably based on your release convention
-          MACOS_URL="https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/popodoro-macos.zip"
+          MACOS_URL="https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/popodoro-macos.dmg"
           WINDOWS_URL="https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/popodoro-${VERSION}-windows-installer.exe"
           
           cat <<EOF > public/appcast.xml
