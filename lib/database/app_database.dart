@@ -20,7 +20,7 @@ class AppDatabase {
     final db = await databaseFactory.openDatabase(
       p.join(dbDir.path, 'sessions.db'),
       options: OpenDatabaseOptions(
-        version: 2,
+        version: 3,
         onCreate: (db, _) async {
           await db.execute('''
             CREATE TABLE sessions (
@@ -28,6 +28,7 @@ class AppDatabase {
               start_time_ms    INTEGER NOT NULL,
               duration_minutes INTEGER NOT NULL,
               task_name        TEXT,
+              tag              TEXT,
               synced_to_cloud  INTEGER NOT NULL DEFAULT 0
             )
           ''');
@@ -59,6 +60,9 @@ class AppDatabase {
               'CREATE INDEX IF NOT EXISTS idx_detection_session ON detection_events(session_id)',
             );
           }
+          if (oldVersion < 3) {
+            await db.execute('ALTER TABLE sessions ADD COLUMN tag TEXT');
+          }
         },
       ),
     );
@@ -71,7 +75,7 @@ class AppDatabase {
     final db = await databaseFactory.openDatabase(
       inMemoryDatabasePath,
       options: OpenDatabaseOptions(
-        version: 2,
+        version: 3,
         onCreate: (db, _) async {
           await db.execute('''
             CREATE TABLE sessions (
@@ -79,6 +83,7 @@ class AppDatabase {
               start_time_ms    INTEGER NOT NULL,
               duration_minutes INTEGER NOT NULL,
               task_name        TEXT,
+              tag              TEXT,
               synced_to_cloud  INTEGER NOT NULL DEFAULT 0
             )
           ''');
@@ -170,6 +175,7 @@ class SessionRow {
     required this.startTimeMs,
     required this.durationMinutes,
     this.taskName,
+    this.tag,
     this.syncedToCloud = false,
   });
 
@@ -177,6 +183,7 @@ class SessionRow {
   final int startTimeMs;
   final int durationMinutes;
   final String? taskName;
+  final String? tag;
   final bool syncedToCloud;
 
   Map<String, Object?> toMap() => {
@@ -184,6 +191,7 @@ class SessionRow {
         'start_time_ms': startTimeMs,
         'duration_minutes': durationMinutes,
         'task_name': taskName,
+        'tag': tag,
         'synced_to_cloud': syncedToCloud ? 1 : 0,
       };
 
@@ -192,6 +200,7 @@ class SessionRow {
         startTimeMs: m['start_time_ms'] as int,
         durationMinutes: m['duration_minutes'] as int,
         taskName: m['task_name'] as String?,
+        tag: m['tag'] as String?,
         syncedToCloud: (m['synced_to_cloud'] as int) == 1,
       );
 }

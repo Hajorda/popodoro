@@ -5,15 +5,15 @@ import 'package:provider/provider.dart';
 import '../../controllers/settings_controller.dart';
 import '../../controllers/timer_controller.dart';
 import '../../core/theme/app_tokens.dart';
+import '../../models/session_tag.dart';
 import '../../services/sound_service.dart';
 import '../common/chip_selector.dart';
 
 // Shows a bottom sheet asking "what are you working on?" before starting focus.
-// Confirms the task name and lets the user override the default duration.
 Future<void> showTaskInputSheet(BuildContext context) {
   return showModalBottomSheet<void>(
     context: context,
-    isScrollControlled: true,      // expands with keyboard
+    isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (_) => const _TaskInputSheet(),
   );
@@ -29,6 +29,7 @@ class _TaskInputSheet extends StatefulWidget {
 class _TaskInputSheetState extends State<_TaskInputSheet> {
   late TextEditingController _textCtrl;
   late int _selectedMinutes;
+  SessionTag? _selectedTag;
 
   @override
   void initState() {
@@ -37,6 +38,7 @@ class _TaskInputSheetState extends State<_TaskInputSheet> {
     final settings = context.read<SettingsController>();
     _textCtrl = TextEditingController(text: timer.taskName);
     _selectedMinutes = settings.focusMinutes;
+    _selectedTag = SessionTag.fromString(timer.tag);
   }
 
   @override
@@ -47,8 +49,8 @@ class _TaskInputSheetState extends State<_TaskInputSheet> {
 
   void _start() {
     final timer = context.read<TimerController>();
-
     timer.setTask(_textCtrl.text);
+    timer.setTag(_selectedTag?.label ?? '');
 
     if (_selectedMinutes != context.read<SettingsController>().focusMinutes) {
       timer.setCustomFocusMinutes(_selectedMinutes);
@@ -64,7 +66,6 @@ class _TaskInputSheetState extends State<_TaskInputSheet> {
     final t = AppTokens.of(context);
 
     return Padding(
-      // Keeps the sheet above the keyboard
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         decoration: BoxDecoration(
@@ -95,7 +96,8 @@ class _TaskInputSheetState extends State<_TaskInputSheet> {
                 // Title
                 Text(
                   'What are you working on?',
-                  style: TextStyle(fontFamily: AppFonts.display, 
+                  style: TextStyle(
+                    fontFamily: AppFonts.display,
                     fontSize: 22,
                     color: t.ink,
                     height: 1.1,
@@ -111,10 +113,31 @@ class _TaskInputSheetState extends State<_TaskInputSheet> {
                 ),
                 const SizedBox(height: 20),
 
+                // Tag picker
+                Text(
+                  'TAG',
+                  style: TextStyle(
+                    fontFamily: AppFonts.mono,
+                    fontSize: 10,
+                    color: t.ink3,
+                    letterSpacing: 0.14,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _TagPicker(
+                  selected: _selectedTag,
+                  t: t,
+                  onSelect: (tag) => setState(
+                    () => _selectedTag = _selectedTag == tag ? null : tag,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
                 // Duration override
                 Text(
                   'DURATION',
-                  style: TextStyle(fontFamily: AppFonts.mono, 
+                  style: TextStyle(
+                    fontFamily: AppFonts.mono,
                     fontSize: 10,
                     color: t.ink3,
                     letterSpacing: 0.14,
@@ -143,6 +166,7 @@ class _TaskInputSheetState extends State<_TaskInputSheet> {
                         onTap: () {
                           context.read<SoundService>().playSwitch();
                           context.read<TimerController>().setTask('');
+                          context.read<TimerController>().setTag('');
                           context.read<TimerController>().start();
                           Navigator.of(context).pop();
                         },
@@ -167,6 +191,60 @@ class _TaskInputSheetState extends State<_TaskInputSheet> {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── Tag picker ────────────────────────────────────────────────────────────────
+
+class _TagPicker extends StatelessWidget {
+  const _TagPicker({required this.selected, required this.t, required this.onSelect});
+
+  final SessionTag? selected;
+  final AppTokens t;
+  final void Function(SessionTag) onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: SessionTag.values.map((tag) {
+        final isSelected = tag == selected;
+        final tagColor = tag.colorFor(t);
+        return GestureDetector(
+          onTap: () => onSelect(tag),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: isSelected ? tagColor.withValues(alpha: 0.14) : t.surface2,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: isSelected ? tagColor.withValues(alpha: 0.6) : t.border,
+                width: isSelected ? 1.5 : 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(tag.emoji, style: const TextStyle(fontSize: 13)),
+                const SizedBox(width: 5),
+                Text(
+                  tag.label,
+                  style: TextStyle(
+                    fontFamily: AppFonts.ui,
+                    fontSize: 13,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                    color: isSelected ? tagColor : t.ink2,
+                    height: 1.0,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }
@@ -246,7 +324,8 @@ class _SheetButton extends StatelessWidget {
         alignment: Alignment.center,
         child: Text(
           label,
-          style: TextStyle(fontFamily: AppFonts.ui, 
+          style: TextStyle(
+            fontFamily: AppFonts.ui,
             fontSize: 15,
             fontWeight: FontWeight.w600,
             color: primary ? t.bg : t.ink2,

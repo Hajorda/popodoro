@@ -23,6 +23,7 @@ class TimerController extends ChangeNotifier {
   int _completedSessions = 0;
   int _currentSession = 1;
   String _taskName = '';
+  String _tag = '';
   Timer? _ticker;
   DateTime? _sessionStartTime;
 
@@ -35,6 +36,7 @@ class TimerController extends ChangeNotifier {
   TimerPhase get phase => _phase;
   TimerStatus get status => _status;
   String get taskName => _taskName;
+  String get tag => _tag;
   int get completedSessions => _completedSessions;
   int get currentSession => _currentSession;
   bool get awaitingCycleAck => _awaitingCycleAck;
@@ -108,6 +110,11 @@ class TimerController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setTag(String tag) {
+    _tag = tag;
+    notifyListeners();
+  }
+
   void setCustomFocusMinutes(int minutes) {
     if (_status == TimerStatus.idle || _status == TimerStatus.complete) {
       _secondsRemaining = minutes * 60;
@@ -168,10 +175,12 @@ class TimerController extends ChangeNotifier {
           startTime: _sessionStartTime!,
           durationMinutes: durationMinutes,
           taskName: _taskName.isNotEmpty ? _taskName : null,
+          tag: _tag.isNotEmpty ? _tag : null,
         ));
       }
       _sessionStartTime = null;
       _taskName = '';
+      _tag = '';
       onFocusComplete?.call();
 
       // Gate: show cycle-complete screen before the long break starts.

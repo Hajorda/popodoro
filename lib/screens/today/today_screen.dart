@@ -7,6 +7,7 @@ import '../../core/theme/app_tokens.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/pomodoro_state.dart';
 import '../../models/session_record.dart';
+import '../../models/session_tag.dart';
 import '../../widgets/mascot/pop_mascot.dart';
 import '../stats/stats_screen.dart';
 
@@ -488,18 +489,7 @@ class _SessionTile extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: t.dim,
-                          border: Border.all(color: t.border),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          'deep work',
-                          style: TextStyle(fontFamily: AppFonts.mono, fontSize: 10, color: t.ink2),
-                        ),
-                      ),
+                      _TagPill(t: t, tagString: session.tag),
                     ],
                   ),
                 ),
@@ -692,6 +682,43 @@ class _PopNote extends StatelessWidget {
                 style: TextStyle(fontFamily: AppFonts.ui, fontSize: 12, color: t.ink2, height: 1.5),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Tag pill ──────────────────────────────────────────────────────────────────
+
+class _TagPill extends StatelessWidget {
+  const _TagPill({required this.t, required this.tagString});
+  final AppTokens t;
+  final String? tagString;
+
+  @override
+  Widget build(BuildContext context) {
+    final tag = SessionTag.fromString(tagString);
+    final tagColor = tag?.colorFor(t) ?? t.ink3;
+    final label = tag?.label ?? 'focus';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: tagColor.withValues(alpha: 0.10),
+        border: Border.all(color: tagColor.withValues(alpha: 0.28)),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (tag != null) ...[
+            Text(tag.emoji, style: const TextStyle(fontSize: 10)),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: TextStyle(fontFamily: AppFonts.mono, fontSize: 10, color: tagColor),
           ),
         ],
       ),

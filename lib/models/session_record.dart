@@ -8,12 +8,14 @@ class SessionRecord {
     required this.startTime,
     required this.durationMinutes,
     this.taskName,
+    this.tag,
   });
 
   final String id;
   final DateTime startTime;
   final int durationMinutes;
   final String? taskName;
+  final String? tag;
 
   // ── Database bridge ───────────────────────────────────────────────────────────
 
@@ -22,6 +24,7 @@ class SessionRecord {
         startTime: DateTime.fromMillisecondsSinceEpoch(row.startTimeMs),
         durationMinutes: row.durationMinutes,
         taskName: row.taskName,
+        tag: row.tag,
       );
 
   SessionRow toRow({bool synced = false}) => SessionRow(
@@ -29,6 +32,7 @@ class SessionRecord {
         startTimeMs: startTime.millisecondsSinceEpoch,
         durationMinutes: durationMinutes,
         taskName: taskName,
+        tag: tag,
         syncedToCloud: synced,
       );
 
@@ -39,6 +43,7 @@ class SessionRecord {
         'startTime': startTime.millisecondsSinceEpoch,
         'durationMinutes': durationMinutes,
         if (taskName != null && taskName!.isNotEmpty) 'taskName': taskName,
+        if (tag != null && tag!.isNotEmpty) 'tag': tag,
       };
 
   factory SessionRecord.fromJson(Map<String, dynamic> json) => SessionRecord(
@@ -47,6 +52,7 @@ class SessionRecord {
             DateTime.fromMillisecondsSinceEpoch(json['startTime'] as int),
         durationMinutes: json['durationMinutes'] as int,
         taskName: json['taskName'] as String?,
+        tag: json['tag'] as String?,
       );
 
   static List<SessionRecord> decodeList(String raw) {
