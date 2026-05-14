@@ -1,10 +1,13 @@
 import 'dart:math' as math;
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../controllers/history_controller.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/theme/app_typography.dart';
+import '../../database/app_database.dart';
+import '../../services/focus_guard_service.dart';
 
 class StatsScreen extends StatefulWidget {
   const StatsScreen({super.key});
@@ -22,10 +25,11 @@ class _StatsScreenState extends State<StatsScreen> {
     return Scaffold(
       backgroundColor: t.bg,
       appBar: _StatsAppBar(t: t),
-      body: Consumer<HistoryController>(
-        builder: (context, history, _) => _StatsBody(
+      body: Consumer2<HistoryController, FocusGuardService>(
+        builder: (context, history, guard, _) => _StatsBody(
           t: t,
           history: history,
+          guard: guard,
           periodIndex: _periodIndex,
           onPeriodChanged: (i) => setState(() => _periodIndex = i),
         ),
@@ -75,9 +79,16 @@ class _StatsAppBar extends StatelessWidget implements PreferredSizeWidget {
 // ── Body ──────────────────────────────────────────────────────────────────────
 
 class _StatsBody extends StatelessWidget {
-  const _StatsBody({required this.t, required this.history, required this.periodIndex, required this.onPeriodChanged});
+  const _StatsBody({
+    required this.t,
+    required this.history,
+    required this.guard,
+    required this.periodIndex,
+    required this.onPeriodChanged,
+  });
   final AppTokens t;
   final HistoryController history;
+  final FocusGuardService guard;
   final int periodIndex;
   final ValueChanged<int> onPeriodChanged;
 
@@ -103,6 +114,10 @@ class _StatsBody extends StatelessWidget {
         _Heatmap(t: t, data: heatmap),
         const SizedBox(height: 22),
         _GoldenHoursCard(t: t, peaks: peaks),
+        const SizedBox(height: 22),
+        _SectionLabel(t: t, label: 'Focus guard'),
+        const SizedBox(height: 10),
+        _FocusGuardStats(t: t, guard: guard),
         if (allTimeMins > 0) ...[
           const SizedBox(height: 22),
           _SectionLabel(t: t, label: 'Where it went'),
@@ -631,6 +646,295 @@ class _TagEntry {
   final Color color;
   final int pct;
   final String hrs;
+}
+
+// ── Focus guard stats ─────────────────────────────────────────────────────────
+
+class _FocusGuardStats extends StatefulWidget {
+  const _FocusGuardStats({required this.t, required this.guard});
+  final AppTokens t;
+  final FocusGuardService guard;
+
+  @override
+  State<_FocusGuardStats> createState() => _FocusGuardStatsState();
+}
+
+class _FocusGuardStatsState extends State<_FocusGuardStats> {
+  List<DetectionSummaryRow>? _summaries;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final rows = await widget.guard.fetchSummaries(limit: 14);
+    if (mounted) setState(() => _summaries = rows);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = widget.t;
+    final summaries = _summaries;
+
+    if (summaries == null) {
+      return Container(
+        height: 100,
+        decoration: BoxDecoration(
+          color: t.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: t.border),
+        ),
+        child: Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2, color: t.pop),
+          ),
+        ),
+      );
+    }
+
+    if (summaries.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: t.dim,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: t.border),
+        ),
+        child: Text(
+          'No guard data yet. Enable Focus Guard in Settings → Focus → Focus guard.',
+          style: TextStyle(
+            fontFamily: AppFonts.ui,
+            fontSize: 13,
+            color: t.ink2,
+            height: 1.5,
+          ),
+        ),
+      );
+    }
+
+    // Totals
+    final totalNoPerson = summaries.fold(0, (s, r) => s + r.noPersonCount);
+    final totalPhone = summaries.fold(0, (s, r) => s + r.phoneCount);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: t.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: t.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Summary chips
+          Row(
+            children: [
+              _GuardStatChip(
+                t: t,
+                emoji: '🚶',
+                count: totalNoPerson,
+                label: 'walk-aways',
+                color: t.ember,
+              ),
+              const SizedBox(width: 10),
+              _GuardStatChip(
+                t: t,
+                emoji: '📱',
+                count: totalPhone,
+                label: 'phone checks',
+                color: t.lavender,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Bar chart
+          Text(
+            'DETECTIONS PER SESSION',
+            style: TextStyle(
+              fontFamily: AppFonts.mono,
+              fontSize: 9,
+              color: t.ink3,
+              letterSpacing: 0.14,
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 100,
+            child: _DetectionBarChart(t: t, summaries: summaries),
+          ),
+          const SizedBox(height: 8),
+          // Legend
+          Row(
+            children: [
+              _LegendDot(color: t.ember),
+              const SizedBox(width: 4),
+              Text('Walk-away', style: TextStyle(fontFamily: AppFonts.mono, fontSize: 9, color: t.ink3)),
+              const SizedBox(width: 12),
+              _LegendDot(color: t.lavender),
+              const SizedBox(width: 4),
+              Text('Phone', style: TextStyle(fontFamily: AppFonts.mono, fontSize: 9, color: t.ink3)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GuardStatChip extends StatelessWidget {
+  const _GuardStatChip({
+    required this.t,
+    required this.emoji,
+    required this.count,
+    required this.label,
+    required this.color,
+  });
+  final AppTokens t;
+  final String emoji;
+  final int count;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 18)),
+            const SizedBox(height: 4),
+            Text(
+              '$count',
+              style: TextStyle(
+                fontFamily: AppFonts.display,
+                fontSize: 22,
+                color: t.ink,
+                height: 1.0,
+              ),
+            ),
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: AppFonts.mono,
+                fontSize: 9,
+                color: t.ink3,
+                letterSpacing: 0.08,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DetectionBarChart extends StatelessWidget {
+  const _DetectionBarChart({required this.t, required this.summaries});
+  final AppTokens t;
+  final List<DetectionSummaryRow> summaries;
+
+  @override
+  Widget build(BuildContext context) {
+    // Show most recent 10 sessions, oldest on left.
+    final data = summaries.reversed.take(10).toList();
+    final maxY = data.fold(0, (m, r) => math.max(m, r.totalCount)).toDouble();
+
+    return BarChart(
+      BarChartData(
+        maxY: maxY > 0 ? maxY + 1 : 5,
+        gridData: const FlGridData(show: false),
+        borderData: FlBorderData(show: false),
+        titlesData: FlTitlesData(
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 22,
+              interval: math.max(1, maxY / 3).ceilToDouble(),
+              getTitlesWidget: (v, _) => Text(
+                '${v.toInt()}',
+                style: TextStyle(
+                  fontFamily: AppFonts.mono,
+                  fontSize: 9,
+                  color: t.ink3,
+                ),
+              ),
+            ),
+          ),
+          bottomTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+        ),
+        barGroups: data.asMap().entries.map((entry) {
+          final i = entry.key;
+          final row = entry.value;
+          return BarChartGroupData(
+            x: i,
+            barRods: [
+              BarChartRodData(
+                toY: row.noPersonCount.toDouble(),
+                width: 8,
+                color: t.ember.withValues(alpha: 0.85),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+              ),
+              BarChartRodData(
+                toY: row.phoneCount.toDouble(),
+                width: 8,
+                color: t.lavender.withValues(alpha: 0.85),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+              ),
+            ],
+            barsSpace: 3,
+          );
+        }).toList(),
+        barTouchData: BarTouchData(
+          touchTooltipData: BarTouchTooltipData(
+            getTooltipColor: (_) => t.surface,
+            tooltipBorder: BorderSide(color: t.border),
+            tooltipRoundedRadius: 8,
+            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+              final row = data[groupIndex];
+              final label = rodIndex == 0
+                  ? '🚶 ${row.noPersonCount}'
+                  : '📱 ${row.phoneCount}';
+              return BarTooltipItem(
+                label,
+                TextStyle(
+                  fontFamily: AppFonts.mono,
+                  fontSize: 11,
+                  color: t.ink,
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LegendDot extends StatelessWidget {
+  const _LegendDot({required this.color});
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+      );
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

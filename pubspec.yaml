@@ -43,6 +43,11 @@ dependencies:
   path: ^1.9.1
   dio: ^5.7.0
   supabase_flutter: ^2.8.4
+  tflite_flutter: ^0.12.0
+  camera: ^0.11.0
+  permission_handler: ^11.3.1
+  fl_chart: ^0.69.0
+  image: ^4.2.0
 
 dev_dependencies:
   flutter_test:
@@ -66,6 +71,7 @@ flutter:
   assets:
     - assets/sounds/
     - assets/icon/icon.png
+    - assets/models/
 
   fonts:
     - family: InstrumentSerif

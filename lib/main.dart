@@ -15,6 +15,7 @@ import 'screens/shell.dart';
 import 'services/auth_service.dart';
 import 'services/bg_music_service.dart';
 import 'services/desktop_tray_service.dart';
+import 'services/focus_guard_service.dart';
 import 'services/sound_service.dart';
 import 'services/sync_service.dart';
 import 'services/together_service.dart';
@@ -109,6 +110,23 @@ class PopodoroApp extends StatelessWidget {
               BgMusicService(settings: ctx.read<SettingsController>()),
           update: (_, settings, timer, previous) {
             (previous ?? BgMusicService(settings: settings)).bindTimer(timer);
+            return previous!;
+          },
+        ),
+        ChangeNotifierProxyProvider2<SettingsController, TimerController,
+            FocusGuardService>(
+          lazy: false,
+          create: (ctx) => FocusGuardService(
+            settings: ctx.read<SettingsController>(),
+            db: db,
+          ),
+          update: (_, settings, timer, previous) {
+            (previous ??
+                    FocusGuardService(
+                      settings: settings,
+                      db: db,
+                    ))
+                .bindTimer(timer);
             return previous!;
           },
         ),

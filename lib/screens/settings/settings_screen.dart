@@ -14,6 +14,7 @@ import 'account_screen.dart';
 import 'appearance_screen.dart';
 import 'background_sound_screen.dart';
 import 'desktop_tray_settings_screen.dart';
+import 'focus_guard_screen.dart';
 import 'nudges_screen.dart';
 import 'timer_settings_screen.dart';
 
@@ -163,10 +164,24 @@ class _SettingsBody extends StatelessWidget {
                       .where((track) => track.id == settings.bgSoundId)
                       .map((track) => track.label)
                       .firstOrNull ?? 'off',
-              isLast: true,
+              isLast: false,
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) => const BackgroundSoundScreen(),
+                ),
+              ),
+            ),
+            _Separator(t: t),
+            _NavRow(
+              t: t,
+              icon: '◉',
+              iconBg: t.lavender.withValues(alpha: 0.25),
+              label: 'Focus guard',
+              value: settings.focusGuardEnabled ? 'on' : 'off',
+              isLast: true,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const FocusGuardScreen(),
                 ),
               ),
             ),

@@ -35,6 +35,7 @@ class SettingsController extends ChangeNotifier {
     required DesktopTrayMode desktopTrayMode,
     required String bgSoundId,
     required double bgVolume,
+    required bool focusGuardEnabled,
   }) : _prefs = prefs,
        _focusMinutes = focusMinutes,
        _shortBreakMinutes = shortBreakMinutes,
@@ -47,7 +48,8 @@ class SettingsController extends ChangeNotifier {
        _timerAppearance = timerAppearance,
        _desktopTrayMode = desktopTrayMode,
        _bgSoundId = bgSoundId,
-       _bgVolume = bgVolume;
+       _bgVolume = bgVolume,
+       _focusGuardEnabled = focusGuardEnabled;
 
   // Load from disk. Call once before runApp.
   static Future<SettingsController> load() async {
@@ -68,6 +70,7 @@ class SettingsController extends ChangeNotifier {
           DesktopTrayMode.values[prefs.getInt(_kDesktopTrayMode) ?? 0],
       bgSoundId: prefs.getString(_kBgSoundId) ?? '',
       bgVolume: prefs.getDouble(_kBgVolume) ?? 0.4,
+      focusGuardEnabled: prefs.getBool(_kFocusGuard) ?? false,
     );
   }
 
@@ -84,6 +87,7 @@ class SettingsController extends ChangeNotifier {
   static const _kDesktopTrayMode = 'desktopTrayMode';
   static const _kBgSoundId = 'bgSoundId';
   static const _kBgVolume = 'bgVolume';
+  static const _kFocusGuard = 'focusGuardEnabled';
 
   final SharedPreferences _prefs;
 
@@ -100,6 +104,7 @@ class SettingsController extends ChangeNotifier {
   DesktopTrayMode _desktopTrayMode;
   String _bgSoundId;
   double _bgVolume;
+  bool _focusGuardEnabled;
 
   // ── Getters ──────────────────────────────────────────────────────────────────
   SharedPreferences get prefs => _prefs;
@@ -115,6 +120,7 @@ class SettingsController extends ChangeNotifier {
   DesktopTrayMode get desktopTrayMode => _desktopTrayMode;
   String get bgSoundId => _bgSoundId;
   double get bgVolume => _bgVolume;
+  bool get focusGuardEnabled => _focusGuardEnabled;
 
   // Valid option sets used by the UI
   static const focusOptions = [15, 25, 50, 90];
@@ -204,6 +210,13 @@ class SettingsController extends ChangeNotifier {
     if (_bgVolume == v) return;
     _bgVolume = v;
     _prefs.setDouble(_kBgVolume, v);
+    notifyListeners();
+  }
+
+  set focusGuardEnabled(bool v) {
+    if (_focusGuardEnabled == v) return;
+    _focusGuardEnabled = v;
+    _prefs.setBool(_kFocusGuard, v);
     notifyListeners();
   }
 }

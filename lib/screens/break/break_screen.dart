@@ -5,6 +5,7 @@ import '../../controllers/timer_controller.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/pomodoro_state.dart';
+import '../../services/focus_guard_service.dart';
 import '../../services/sound_service.dart';
 import '../../services/window_service.dart';
 import '../../widgets/mascot/pop_mascot.dart';
@@ -19,8 +20,9 @@ class BreakScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: t.bg,
       body: SafeArea(
-        child: Consumer<TimerController>(
-          builder: (context, timer, _) => _BreakContent(timer: timer, t: t),
+        child: Consumer2<TimerController, FocusGuardService>(
+          builder: (context, timer, guard, _) =>
+              _BreakContent(timer: timer, guard: guard, t: t),
         ),
       ),
     );
@@ -28,9 +30,14 @@ class BreakScreen extends StatelessWidget {
 }
 
 class _BreakContent extends StatelessWidget {
-  const _BreakContent({required this.timer, required this.t});
+  const _BreakContent({
+    required this.timer,
+    required this.guard,
+    required this.t,
+  });
 
   final TimerController timer;
+  final FocusGuardService guard;
   final AppTokens t;
 
   bool get _isLong => timer.phase == TimerPhase.longBreak;
@@ -132,6 +139,14 @@ class _BreakContent extends StatelessWidget {
             trackColor: t.surface2,
           ),
         ),
+        // Focus guard summary (shown if guard was active this session)
+        if (guard.sessionEvents.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: _GuardSummaryCard(t: t, guard: guard),
+          ),
+          const SizedBox(height: 12),
+        ],
         const Spacer(flex: 3),
         // Action buttons
         Padding(
@@ -213,6 +228,126 @@ class _BreakContent extends StatelessWidget {
     );
   }
 }
+
+// ── Guard summary ─────────────────────────────────────────────────────────────
+
+class _GuardSummaryCard extends StatelessWidget {
+  const _GuardSummaryCard({required this.t, required this.guard});
+  final AppTokens t;
+  final FocusGuardService guard;
+
+  @override
+  Widget build(BuildContext context) {
+    final events = guard.sessionEvents;
+    final noPersonCount =
+        events.where((e) => e.type == 'no_person').length;
+    final phoneCount = events.where((e) => e.type == 'phone').length;
+    final total = noPersonCount + phoneCount;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: t.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: t.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.visibility_rounded, size: 14, color: t.ink3),
+              const SizedBox(width: 6),
+              Text(
+                'FOCUS GUARD',
+                style: TextStyle(
+                  fontFamily: AppFonts.mono,
+                  fontSize: 9,
+                  color: t.ink3,
+                  letterSpacing: 0.14,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          total == 0
+              ? Text(
+                  '✓ No distractions detected',
+                  style: TextStyle(
+                    fontFamily: AppFonts.ui,
+                    fontSize: 13,
+                    color: t.sage,
+                    fontWeight: FontWeight.w500,
+                  ),
+                )
+              : Row(
+                  children: [
+                    if (noPersonCount > 0)
+                      _GuardChip(
+                        t: t,
+                        emoji: '🚶',
+                        label: '$noPersonCount walk-away${noPersonCount > 1 ? "s" : ""}',
+                        color: t.ember,
+                      ),
+                    if (noPersonCount > 0 && phoneCount > 0)
+                      const SizedBox(width: 8),
+                    if (phoneCount > 0)
+                      _GuardChip(
+                        t: t,
+                        emoji: '📱',
+                        label: '$phoneCount phone check${phoneCount > 1 ? "s" : ""}',
+                        color: t.lavender,
+                      ),
+                  ],
+                ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GuardChip extends StatelessWidget {
+  const _GuardChip({
+    required this.t,
+    required this.emoji,
+    required this.label,
+    required this.color,
+  });
+  final AppTokens t;
+  final String emoji;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 13)),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: AppFonts.mono,
+              fontSize: 10,
+              color: color,
+              letterSpacing: 0.06,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Progress bar ──────────────────────────────────────────────────────────────
 
 class _ProgressBar extends StatelessWidget {
   const _ProgressBar({

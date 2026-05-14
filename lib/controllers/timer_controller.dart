@@ -38,6 +38,7 @@ class TimerController extends ChangeNotifier {
   int get completedSessions => _completedSessions;
   int get currentSession => _currentSession;
   bool get awaitingCycleAck => _awaitingCycleAck;
+  DateTime? get sessionStartTime => _sessionStartTime;
 
   int get totalSecondsForPhase {
     switch (_phase) {

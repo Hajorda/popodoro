@@ -28,5 +28,7 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Popodoro uses your camera to check if you're at your desk during focus sessions. No video is recorded or transmitted.</string>
 </dict>
 </plist>
