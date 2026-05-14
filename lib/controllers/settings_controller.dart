@@ -33,6 +33,8 @@ class SettingsController extends ChangeNotifier {
     required ThemeMode themeMode,
     required TimerAppearance timerAppearance,
     required DesktopTrayMode desktopTrayMode,
+    required String bgSoundId,
+    required double bgVolume,
   }) : _prefs = prefs,
        _focusMinutes = focusMinutes,
        _shortBreakMinutes = shortBreakMinutes,
@@ -43,7 +45,9 @@ class SettingsController extends ChangeNotifier {
        _autoStartFocus = autoStartFocus,
        _themeMode = themeMode,
        _timerAppearance = timerAppearance,
-       _desktopTrayMode = desktopTrayMode;
+       _desktopTrayMode = desktopTrayMode,
+       _bgSoundId = bgSoundId,
+       _bgVolume = bgVolume;
 
   // Load from disk. Call once before runApp.
   static Future<SettingsController> load() async {
@@ -62,6 +66,8 @@ class SettingsController extends ChangeNotifier {
           TimerAppearance.values[prefs.getInt(_kTimerAppearance) ?? 0],
       desktopTrayMode:
           DesktopTrayMode.values[prefs.getInt(_kDesktopTrayMode) ?? 0],
+      bgSoundId: prefs.getString(_kBgSoundId) ?? '',
+      bgVolume: prefs.getDouble(_kBgVolume) ?? 0.4,
     );
   }
 
@@ -76,6 +82,8 @@ class SettingsController extends ChangeNotifier {
   static const _kTheme = 'themeMode';
   static const _kTimerAppearance = 'timerAppearance';
   static const _kDesktopTrayMode = 'desktopTrayMode';
+  static const _kBgSoundId = 'bgSoundId';
+  static const _kBgVolume = 'bgVolume';
 
   final SharedPreferences _prefs;
 
@@ -90,6 +98,8 @@ class SettingsController extends ChangeNotifier {
   ThemeMode _themeMode;
   TimerAppearance _timerAppearance;
   DesktopTrayMode _desktopTrayMode;
+  String _bgSoundId;
+  double _bgVolume;
 
   // ── Getters ──────────────────────────────────────────────────────────────────
   SharedPreferences get prefs => _prefs;
@@ -103,6 +113,8 @@ class SettingsController extends ChangeNotifier {
   ThemeMode get themeMode => _themeMode;
   TimerAppearance get timerAppearance => _timerAppearance;
   DesktopTrayMode get desktopTrayMode => _desktopTrayMode;
+  String get bgSoundId => _bgSoundId;
+  double get bgVolume => _bgVolume;
 
   // Valid option sets used by the UI
   static const focusOptions = [15, 25, 50, 90];
@@ -178,6 +190,20 @@ class SettingsController extends ChangeNotifier {
     if (_desktopTrayMode == v) return;
     _desktopTrayMode = v;
     _prefs.setInt(_kDesktopTrayMode, v.index);
+    notifyListeners();
+  }
+
+  set bgSoundId(String v) {
+    if (_bgSoundId == v) return;
+    _bgSoundId = v;
+    _prefs.setString(_kBgSoundId, v);
+    notifyListeners();
+  }
+
+  set bgVolume(double v) {
+    if (_bgVolume == v) return;
+    _bgVolume = v;
+    _prefs.setDouble(_kBgVolume, v);
     notifyListeners();
   }
 }

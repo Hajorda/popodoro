@@ -9,8 +9,10 @@ import '../../models/pomodoro_state.dart';
 import '../../services/auth_service.dart';
 import '../../services/sync_service.dart';
 import '../../services/window_service.dart';
+import '../../services/bg_music_service.dart';
 import 'account_screen.dart';
 import 'appearance_screen.dart';
+import 'background_sound_screen.dart';
 import 'desktop_tray_settings_screen.dart';
 import 'nudges_screen.dart';
 import 'timer_settings_screen.dart';
@@ -146,8 +148,27 @@ class _SettingsBody extends StatelessWidget {
               iconBg: t.surface2,
               label: 'Sounds',
               value: settings.soundEnabled ? 'on' : 'off',
-              isLast: true,
+              isLast: false,
               onTap: () {},
+            ),
+            _Separator(t: t),
+            _NavRow(
+              t: t,
+              icon: '♫',
+              iconBg: t.sage.withValues(alpha: 0.25),
+              label: 'Ambient sounds',
+              value: settings.bgSoundId.isEmpty
+                  ? 'off'
+                  : kBgTracks
+                      .where((track) => track.id == settings.bgSoundId)
+                      .map((track) => track.label)
+                      .firstOrNull ?? 'off',
+              isLast: true,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const BackgroundSoundScreen(),
+                ),
+              ),
             ),
           ],
         ),

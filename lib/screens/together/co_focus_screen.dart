@@ -49,6 +49,9 @@ class _CoFocusScreenState extends State<CoFocusScreen> {
     // Only the host drives phase transitions — single source of truth.
     if (!together.isHost) return;
 
+    // Don't auto-transition while paused.
+    if (room.isPaused) return;
+
     if (room.isFocusing && room.remaining == Duration.zero && !_breakTriggered) {
       _breakTriggered = true;
       together.startBreak();
@@ -459,30 +462,40 @@ class _TopBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // LIVE pill (replaces wordmark in co-focus context)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: t.ember.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                PulsingDot(color: t.ember, size: 6),
-                const SizedBox(width: 6),
-                Text(
-                  'LIVE · ${together.participants.length} FOCUSING',
-                  style: TextStyle(
-                    fontFamily: AppFonts.mono,
-                    fontSize: 9,
-                    color: t.ember,
-                    letterSpacing: 0.14,
+          // LIVE / PAUSED pill
+          Builder(builder: (context) {
+            final room = together.room!;
+            final isPaused = room.isPaused;
+            final pillColor = isPaused ? t.ink3 : t.ember;
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: pillColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isPaused)
+                    Icon(Icons.pause_circle_outline_rounded, size: 8, color: pillColor)
+                  else
+                    PulsingDot(color: pillColor, size: 6),
+                  const SizedBox(width: 6),
+                  Text(
+                    isPaused
+                        ? 'PAUSED · ${together.participants.length} WAITING'
+                        : 'LIVE · ${together.participants.length} FOCUSING',
+                    style: TextStyle(
+                      fontFamily: AppFonts.mono,
+                      fontSize: 9,
+                      color: pillColor,
+                      letterSpacing: 0.14,
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
+                ],
+              ),
+            );
+          }),
 
           // Right icons — same 36×36 circle style as HomeScreen
           Row(
@@ -704,19 +717,34 @@ class _ActionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isHost = together.isHost;
+    final room = together.room!;
+    final isPaused = room.isPaused;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 22),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // +5 button — same secondary small style as HomeScreen
+          // +5 — disabled when paused (time isn't running)
           _SmallBtn(
             t: t,
             label: '+ 5',
-            onTap: isHost ? () => together.addMinutes(5) : null,
+            onTap: isHost && !isPaused ? () => together.addMinutes(5) : null,
           ),
           const SizedBox(width: 10),
+
+          // Pause/Resume — host only, visible during active/paused phases
+          if (isHost) ...[
+            _SmallBtn(
+              t: t,
+              icon: isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+              label: isPaused ? 'Resume' : 'Pause',
+              onTap: isPaused
+                  ? () => together.resumeSession()
+                  : () => together.pauseSession(),
+            ),
+            const SizedBox(width: 10),
+          ],
 
           // Primary CTA
           Expanded(
@@ -886,9 +914,10 @@ class _PrimaryBtn extends StatelessWidget {
 }
 
 class _SmallBtn extends StatelessWidget {
-  const _SmallBtn({required this.t, required this.label, this.onTap});
+  const _SmallBtn({required this.t, required this.label, this.icon, this.onTap});
   final AppTokens t;
   final String label;
+  final IconData? icon;
   final VoidCallback? onTap;
 
   @override
@@ -903,15 +932,17 @@ class _SmallBtn extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: t.border),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontFamily: AppFonts.ui,
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
-            color: enabled ? t.ink : t.ink3,
-          ),
-        ),
+        child: icon != null
+            ? Icon(icon, size: 18, color: enabled ? t.ink : t.ink3)
+            : Text(
+                label,
+                style: TextStyle(
+                  fontFamily: AppFonts.ui,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: enabled ? t.ink : t.ink3,
+                ),
+              ),
       ),
     );
   }

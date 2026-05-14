@@ -13,6 +13,7 @@ import 'core/theme/app_theme.dart';
 import 'database/app_database.dart';
 import 'screens/shell.dart';
 import 'services/auth_service.dart';
+import 'services/bg_music_service.dart';
 import 'services/desktop_tray_service.dart';
 import 'services/sound_service.dart';
 import 'services/sync_service.dart';
@@ -100,6 +101,16 @@ class PopodoroApp extends StatelessWidget {
             onSessionComplete: ctx.read<HistoryController>().record,
           ),
           update: (_, s, previous) => previous!,
+        ),
+        ChangeNotifierProxyProvider2<SettingsController, TimerController,
+            BgMusicService>(
+          lazy: false,
+          create: (ctx) =>
+              BgMusicService(settings: ctx.read<SettingsController>()),
+          update: (_, settings, timer, previous) {
+            (previous ?? BgMusicService(settings: settings)).bindTimer(timer);
+            return previous!;
+          },
         ),
         ProxyProvider3<SettingsController, TimerController, TogetherService,
             DesktopTrayService>(

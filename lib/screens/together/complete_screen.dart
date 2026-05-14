@@ -6,7 +6,7 @@ import '../../core/theme/app_typography.dart';
 import '../../services/together_service.dart';
 import '../../widgets/mascot/pop_mascot.dart';
 import '../../widgets/together/buddy_avatar.dart';
-import 'create_room_screen.dart';
+import 'lobby_screen.dart';
 
 class CompleteScreen extends StatelessWidget {
   const CompleteScreen({super.key});
@@ -363,16 +363,16 @@ class _CTAButtons extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // "Pop another?" — creates a fresh room
+        // "Pop another?" — resets the same room back to lobby
         SizedBox(
           width: double.infinity,
           child: GestureDetector(
             onTap: () async {
-              await together.leaveRoom();
+              // Host resets the room; non-host just navigates and waits for Realtime.
+              if (together.isHost) await together.resetRoom();
               if (context.mounted) {
                 Navigator.of(context).pushReplacement(
-                  MaterialPageRoute<void>(
-                      builder: (_) => const CreateRoomScreen()),
+                  MaterialPageRoute<void>(builder: (_) => const LobbyScreen()),
                 );
               }
             },

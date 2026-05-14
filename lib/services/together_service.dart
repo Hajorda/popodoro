@@ -14,6 +14,7 @@ class TogetherRoom {
     this.startedAt,
     this.breakMinutes = 5,
     this.breakStartedAt,
+    this.elapsedSeconds = 0,
   });
 
   final String id;
@@ -21,13 +22,15 @@ class TogetherRoom {
   final String hostId;
   final String? taskName;
   final int durationMinutes;
-  final String status; // lobby | active | break | complete
+  final String status; // lobby | active | paused | break | complete
   final DateTime? startedAt;
   final int breakMinutes;
   final DateTime? breakStartedAt;
+  final int elapsedSeconds;
 
   bool get isLobby => status == 'lobby';
   bool get isFocusing => status == 'active';
+  bool get isPaused => status == 'paused';
   bool get isOnBreak => status == 'break';
   bool get isComplete => status == 'complete';
 
@@ -45,9 +48,10 @@ class TogetherRoom {
         breakStartedAt: m['break_started_at'] != null
             ? DateTime.parse(m['break_started_at'] as String).toLocal()
             : null,
+        elapsedSeconds: (m['elapsed_seconds'] as int?) ?? 0,
       );
 
-  TogetherRoom copyWith({String? status, DateTime? startedAt, DateTime? breakStartedAt}) =>
+  TogetherRoom copyWith({String? status, DateTime? startedAt, DateTime? breakStartedAt, int? elapsedSeconds}) =>
       TogetherRoom(
         id: id,
         code: code,
@@ -58,10 +62,15 @@ class TogetherRoom {
         startedAt: startedAt ?? this.startedAt,
         breakMinutes: breakMinutes,
         breakStartedAt: breakStartedAt ?? this.breakStartedAt,
+        elapsedSeconds: elapsedSeconds ?? this.elapsedSeconds,
       );
 
   Duration get remaining {
     if (startedAt == null) return Duration(minutes: durationMinutes);
+    if (isPaused) {
+      final left = Duration(minutes: durationMinutes) - Duration(seconds: elapsedSeconds);
+      return left.isNegative ? Duration.zero : left;
+    }
     final elapsed = DateTime.now().difference(startedAt!);
     final total = Duration(minutes: durationMinutes);
     final left = total - elapsed;
@@ -70,6 +79,7 @@ class TogetherRoom {
 
   double get progress {
     if (startedAt == null) return 0;
+    if (isPaused) return (elapsedSeconds / (durationMinutes * 60)).clamp(0.0, 1.0);
     final elapsed = DateTime.now().difference(startedAt!).inSeconds;
     final total = durationMinutes * 60;
     return (elapsed / total).clamp(0.0, 1.0);
@@ -96,13 +106,13 @@ class TogetherRoom {
     return '$m:$s';
   }
 
-  String get timeDisplay => isFocusing || isLobby
+  String get timeDisplay => isFocusing || isLobby || isPaused
       ? _fmt(remaining)
       : isOnBreak
           ? _fmt(breakRemaining)
           : '00:00';
 
-  double get currentProgress => isFocusing ? progress : isOnBreak ? breakProgress : 1.0;
+  double get currentProgress => isFocusing || isPaused ? progress : isOnBreak ? breakProgress : 1.0;
 }
 
 class TogetherParticipant {
@@ -283,6 +293,46 @@ class TogetherService extends ChangeNotifier {
         .eq('id', _room!.id);
   }
 
+  /// Host → pauses the focus timer.
+  Future<void> pauseSession() async {
+    if (_room == null || !isHost || !_room!.isFocusing) return;
+    final elapsed = DateTime.now().difference(_room!.startedAt!).inSeconds;
+    await _client.from('rooms').update({
+      'status': 'paused',
+      'elapsed_seconds': elapsed,
+    }).eq('id', _room!.id);
+  }
+
+  /// Host → resumes a paused session.
+  Future<void> resumeSession() async {
+    if (_room == null || !isHost || !_room!.isPaused) return;
+    final newStartedAt = DateTime.now()
+        .subtract(Duration(seconds: _room!.elapsedSeconds))
+        .toUtc()
+        .toIso8601String();
+    await _client.from('rooms').update({
+      'status': 'active',
+      'started_at': newStartedAt,
+      'elapsed_seconds': 0,
+    }).eq('id', _room!.id);
+    _updateTicker();
+  }
+
+  /// Host → resets the room to lobby so everyone can go again.
+  Future<void> resetRoom() async {
+    if (_room == null || !isHost) return;
+    await _client.from('rooms').update({
+      'status': 'lobby',
+      'started_at': null,
+      'break_started_at': null,
+      'elapsed_seconds': 0,
+    }).eq('id', _room!.id);
+    await _client
+        .from('room_participants')
+        .update({'status': 'ready'})
+        .eq('room_id', _room!.id);
+  }
+
   /// Host → adds [minutes] to the focus duration (live extension).
   Future<void> addMinutes(int minutes) async {
     if (_room == null || !isHost) return;
@@ -408,7 +458,7 @@ class TogetherService extends ChangeNotifier {
   }
 
   void _updateTicker() {
-    final needsTick = _room != null && (_room!.isFocusing || _room!.isOnBreak);
+    final needsTick = _room != null && (_room!.isFocusing || _room!.isOnBreak) && !_room!.isPaused;
     if (needsTick && _ticker == null) {
       _ticker = Timer.periodic(const Duration(seconds: 1), (_) => notifyListeners());
     } else if (!needsTick) {
