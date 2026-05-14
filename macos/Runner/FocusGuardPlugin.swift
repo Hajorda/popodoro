@@ -150,7 +150,6 @@ class FocusGuardPlugin: NSObject, FlutterPlugin, AVCapturePhotoCaptureDelegate {
     }
     pendingResult = result
     let settings = AVCapturePhotoSettings()
-    settings.flashMode = .off
     output.capturePhoto(with: settings, delegate: self)
   }
 

@@ -9,7 +9,7 @@ class MainFlutterWindow: NSWindow {
     self.setFrame(windowFrame, display: true)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
-    FocusGuardPlugin.register(with: flutterViewController.registrar(forPlugin: "FocusGuardPlugin")!)
+    FocusGuardPlugin.register(with: flutterViewController.registrar(forPlugin: "FocusGuardPlugin"))
 
     super.awakeFromNib()
   }

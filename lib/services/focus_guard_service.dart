@@ -21,13 +21,9 @@ enum GuardStatus { idle, active, noPersonDetected, phoneDetected, cameraError }
 
 enum CameraFailure { permissionDenied, noCamera, other }
 
-// COCO class indices for YOLO (80-class model).
 const _kPersonClass = 0;
-const _kPhoneClass = 67;
+const _kPhoneClass = 67; // falls back gracefully if model has fewer classes
 const _kConfidenceThreshold = 0.30;
-
-// Input resolution expected by the model.
-const _kInputSize = 640;
 
 // Method channel for native macOS camera — matches FocusGuardPlugin.swift
 const _kChannel = 'com.popodoro/focus_guard';
@@ -55,6 +51,7 @@ class FocusGuardService extends ChangeNotifier {
   int _numFeatures = 84;
   int _numAnchors = 8400;
   bool _transposedOutput = false;
+  int _inputSize = 640; // auto-detected from model input tensor
 
   // Camera (mobile / Windows — camera package)
   CameraController? _camera;
@@ -221,6 +218,13 @@ class FocusGuardService extends ChangeNotifier {
       );
       _interpreter!.allocateTensors();
 
+      // Auto-detect input size from input tensor [1, H, W, C] or [1, size, size, C].
+      final inShape = _interpreter!.getInputTensor(0).shape;
+      debugPrint('[FocusGuard] input shape: $inShape');
+      if (inShape.length == 4 && inShape[1] > 0) {
+        _inputSize = inShape[1]; // use H dimension
+      }
+
       final outShape = _interpreter!.getOutputTensor(0).shape;
       debugPrint('[FocusGuard] output shape: $outShape');
       if (outShape.length == 3) {
@@ -234,10 +238,13 @@ class FocusGuardService extends ChangeNotifier {
           _numAnchors = outShape[2];
         }
       }
+      final numClasses = _numFeatures - 4;
       debugPrint(
         '[FocusGuard] model ready — '
+        'input=$_inputSize '
         '${_transposedOutput ? "transposed" : "standard"} '
-        'features=$_numFeatures anchors=$_numAnchors',
+        'anchors=$_numAnchors features=$_numFeatures classes=$numClasses '
+        '(person=class0, phone=class${_kPhoneClass < numClasses ? _kPhoneClass : "n/a"})',
       );
       return true;
     } catch (e) {
@@ -400,13 +407,13 @@ class FocusGuardService extends ChangeNotifier {
       final decoded = img.decodeImage(bytes);
       if (decoded == null) return const _DetectionResult(false, false);
 
-      final resized =
-          img.copyResize(decoded, width: _kInputSize, height: _kInputSize);
+      final sz = _inputSize;
+      final resized = img.copyResize(decoded, width: sz, height: sz);
 
-      final inputBytes = Uint8List(_kInputSize * _kInputSize * 3);
+      final inputBytes = Uint8List(sz * sz * 3);
       var idx = 0;
-      for (var y = 0; y < _kInputSize; y++) {
-        for (var x = 0; x < _kInputSize; x++) {
+      for (var y = 0; y < sz; y++) {
+        for (var x = 0; x < sz; x++) {
           final pixel = resized.getPixel(x, y);
           inputBytes[idx++] = pixel.r.toInt().clamp(0, 255);
           inputBytes[idx++] = pixel.g.toInt().clamp(0, 255);
