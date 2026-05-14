@@ -42,7 +42,6 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
       scrolledUnderElevation: 0,
       leading: GestureDetector(
         onTap: () async {
-          // Stop preview when leaving the screen.
           await context.read<BgMusicService>().stopPreview();
           if (context.mounted) Navigator.of(context).pop();
         },
@@ -88,9 +87,8 @@ class _Body extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
       children: [
-        // Subtitle
         Text(
-          'Plays softly during focus sessions. Pauses on breaks.',
+          'Plays softly during focus sessions. Pauses automatically on breaks.',
           style: TextStyle(
             fontFamily: AppFonts.ui,
             fontSize: 13,
@@ -100,39 +98,51 @@ class _Body extends StatelessWidget {
         ),
         const SizedBox(height: 20),
 
-        // "None" option
+        // "None" tile
         _TrackTile(
           t: t,
           emoji: '✕',
           label: 'None',
-          subtitle: 'No background music',
+          subtitle: 'Silence',
           selected: selectedId.isEmpty,
           previewing: false,
+          downloading: false,
+          downloadProgress: null,
           onSelect: () async {
             await music.stopPreview();
             settings.bgSoundId = '';
           },
           onPreview: null,
         ),
-
         const SizedBox(height: 8),
 
         // Track tiles
         ...kBgTracks.map((track) {
           final isSelected = selectedId == track.id;
           final isPreviewing = music.isPreviewing && isSelected;
+          final isDownloading = music.isDownloading(track.id);
+          final progress = music.downloadProgress(track.id);
+
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: _TrackTile(
               t: t,
               emoji: track.emoji,
               label: track.label,
-              subtitle: isSelected ? 'Selected' : null,
+              subtitle: isDownloading
+                  ? 'Downloading…'
+                  : isSelected
+                      ? 'Selected'
+                      : null,
               selected: isSelected,
               previewing: isPreviewing,
+              downloading: isDownloading,
+              downloadProgress: progress,
               onSelect: () async {
                 await music.stopPreview();
                 settings.bgSoundId = track.id;
+                // Pre-cache in background so the first play is instant.
+                unawaited(music.ensureCached(track.id));
               },
               onPreview: () async {
                 if (isPreviewing) {
@@ -148,7 +158,7 @@ class _Body extends StatelessWidget {
 
         const SizedBox(height: 24),
 
-        // Volume slider — only shown when a track is selected
+        // Volume card — only shown when a track is selected
         if (selectedId.isNotEmpty) ...[
           _SectionLabel(t: t, label: 'VOLUME'),
           const SizedBox(height: 12),
@@ -168,6 +178,8 @@ class _TrackTile extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.previewing,
+    required this.downloading,
+    required this.downloadProgress,
     required this.onSelect,
     this.subtitle,
     this.onPreview,
@@ -179,113 +191,184 @@ class _TrackTile extends StatelessWidget {
   final String? subtitle;
   final bool selected;
   final bool previewing;
+  final bool downloading;
+  final double? downloadProgress; // null = indeterminate
   final VoidCallback onSelect;
   final VoidCallback? onPreview;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onSelect,
+      onTap: downloading ? null : onSelect,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: selected ? t.pop.withValues(alpha: 0.12) : t.surface,
+          color: selected ? t.pop.withValues(alpha: 0.1) : t.surface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: selected ? t.pop : t.border,
             width: selected ? 1.5 : 1,
           ),
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Emoji icon
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: selected ? t.pop.withValues(alpha: 0.18) : t.surface2,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Center(
-                child: Text(emoji, style: const TextStyle(fontSize: 18)),
-              ),
-            ),
-            const SizedBox(width: 14),
-
-            // Labels
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
                 children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontFamily: AppFonts.ui,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      color: t.ink,
+                  // Emoji badge
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? t.pop.withValues(alpha: 0.18)
+                          : t.surface2,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Center(
+                      child: Text(emoji, style: const TextStyle(fontSize: 20)),
                     ),
                   ),
-                  if (subtitle != null)
-                    Text(
-                      subtitle!,
-                      style: TextStyle(
-                        fontFamily: AppFonts.mono,
-                        fontSize: 10,
-                        color: selected ? t.pop : t.ink3,
-                        letterSpacing: 0.1,
+                  const SizedBox(width: 14),
+
+                  // Labels
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          label,
+                          style: TextStyle(
+                            fontFamily: AppFonts.ui,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                            color: t.ink,
+                          ),
+                        ),
+                        if (subtitle != null)
+                          Text(
+                            subtitle!,
+                            style: TextStyle(
+                              fontFamily: AppFonts.mono,
+                              fontSize: 10,
+                              color: downloading
+                                  ? t.ink3
+                                  : selected
+                                      ? t.pop
+                                      : t.ink3,
+                              letterSpacing: 0.1,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+
+                  // Preview / download-progress button
+                  if (onPreview != null) ...[
+                    GestureDetector(
+                      onTap: downloading ? null : onPreview,
+                      behavior: HitTestBehavior.opaque,
+                      child: SizedBox(
+                        width: 36,
+                        height: 36,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 180),
+                          child: downloading
+                              ? _DownloadingIcon(
+                                  key: const ValueKey('dl'),
+                                  progress: downloadProgress,
+                                  color: t.ink3,
+                                )
+                              : _PlayStopIcon(
+                                  key: const ValueKey('ps'),
+                                  t: t,
+                                  previewing: previewing,
+                                ),
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 8),
+                  ],
+
+                  // Selection circle
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: selected ? t.pop : Colors.transparent,
+                      border: Border.all(
+                        color: selected ? t.pop : t.border,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: selected
+                        ? Icon(Icons.check_rounded, size: 12, color: t.ink)
+                        : null,
+                  ),
                 ],
               ),
             ),
 
-            // Preview button (only for actual tracks)
-            if (onPreview != null)
-              GestureDetector(
-                onTap: onPreview,
-                behavior: HitTestBehavior.opaque,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 120),
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: previewing
-                        ? t.pop.withValues(alpha: 0.2)
-                        : t.surface2,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    previewing ? Icons.stop_rounded : Icons.play_arrow_rounded,
-                    size: 18,
-                    color: previewing ? t.pop : t.ink3,
-                  ),
+            // Thin download progress bar at the bottom of the tile
+            if (downloading)
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(13),
+                ),
+                child: LinearProgressIndicator(
+                  value: downloadProgress, // null = indeterminate
+                  minHeight: 3,
+                  backgroundColor: t.surface2,
+                  valueColor: AlwaysStoppedAnimation<Color>(t.pop),
                 ),
               ),
-
-            const SizedBox(width: 8),
-
-            // Selection indicator
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: selected ? t.pop : Colors.transparent,
-                border: Border.all(
-                  color: selected ? t.pop : t.border,
-                  width: 1.5,
-                ),
-              ),
-              child: selected
-                  ? Icon(Icons.check_rounded, size: 12, color: t.ink)
-                  : null,
-            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _DownloadingIcon extends StatelessWidget {
+  const _DownloadingIcon({super.key, required this.progress, required this.color});
+  final double? progress;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(9),
+      child: CircularProgressIndicator(
+        value: progress,
+        strokeWidth: 2,
+        color: color,
+      ),
+    );
+  }
+}
+
+class _PlayStopIcon extends StatelessWidget {
+  const _PlayStopIcon({super.key, required this.t, required this.previewing});
+  final AppTokens t;
+  final bool previewing;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 120),
+      decoration: BoxDecoration(
+        color: previewing ? t.pop.withValues(alpha: 0.2) : t.surface2,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(
+        previewing ? Icons.stop_rounded : Icons.play_arrow_rounded,
+        size: 18,
+        color: previewing ? t.pop : t.ink3,
       ),
     );
   }
@@ -294,7 +377,8 @@ class _TrackTile extends StatelessWidget {
 // ── Volume slider ─────────────────────────────────────────────────────────────
 
 class _VolumeSlider extends StatelessWidget {
-  const _VolumeSlider({required this.t, required this.settings, required this.music});
+  const _VolumeSlider(
+      {required this.t, required this.settings, required this.music});
   final AppTokens t;
   final SettingsController settings;
   final BgMusicService music;
@@ -302,7 +386,7 @@ class _VolumeSlider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
       decoration: BoxDecoration(
         color: t.surface,
         borderRadius: BorderRadius.circular(14),
@@ -355,7 +439,6 @@ class _VolumeSlider extends StatelessWidget {
               max: 1,
               onChanged: (v) {
                 settings.bgVolume = v;
-                // Update the player volume in real time.
                 unawaited(music.setVolume(v));
               },
             ),
