@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
@@ -10,6 +13,9 @@ class WindowService extends ChangeNotifier {
 
   bool get isMiniMode => _isMiniMode;
 
+  static bool get isDesktop =>
+      !kIsWeb && (Platform.isMacOS || Platform.isWindows);
+
   static const Size miniSize = Size(240, 80);
   static const Size fullSize = Size(440, 680);
 
@@ -17,6 +23,7 @@ class WindowService extends ChangeNotifier {
   static const _kMiniY = 'miniWindowY';
 
   Future<void> enterMiniMode() async {
+    if (!isDesktop) return;
     await windowManager.setResizable(false);
     await windowManager.setSkipTaskbar(true);
     await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
@@ -29,6 +36,7 @@ class WindowService extends ChangeNotifier {
   }
 
   Future<void> exitMiniMode() async {
+    if (!isDesktop) return;
     await _saveCurrentPosition();
     await windowManager.setAlwaysOnTop(false);
     await windowManager.setSkipTaskbar(false);
@@ -46,9 +54,7 @@ class WindowService extends ChangeNotifier {
       final offset = await windowManager.getPosition();
       await _prefs.setDouble(_kMiniX, offset.dx);
       await _prefs.setDouble(_kMiniY, offset.dy);
-    } catch (_) {
-      // Position save is best-effort; silently ignore failures.
-    }
+    } catch (_) {}
   }
 
   Future<void> _restoreOrDefaultPosition() async {
@@ -57,6 +63,5 @@ class WindowService extends ChangeNotifier {
     if (x != null && y != null) {
       await windowManager.setPosition(Offset(x, y));
     }
-    // If no saved position, let the OS decide; it will be remembered after first use.
   }
 }

@@ -76,9 +76,11 @@ class _CoFocusScreenState extends State<CoFocusScreen> {
   @override
   Widget build(BuildContext context) {
     // ── Mini mode: hand over to the pill (which reads TogetherService) ────────
-    final windowService = context.watch<WindowService>();
-    if (windowService.isMiniMode) {
-      return const MiniTimerPill();
+    if (WindowService.isDesktop) {
+      final windowService = context.watch<WindowService>();
+      if (windowService.isMiniMode) {
+        return const MiniTimerPill();
+      }
     }
 
     final t = AppTokens.of(context);
@@ -404,25 +406,25 @@ class _BreakBody extends StatelessWidget {
           ],
         ),
 
-        // PiP button — top right, same as BreakScreen
-        Positioned(
-          top: 12,
-          right: 16,
-          child: GestureDetector(
-            onTap: () => context.read<WindowService>().enterMiniMode(),
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: t.surface,
-                border: Border.all(color: t.border),
+        if (WindowService.isDesktop)
+          Positioned(
+            top: 12,
+            right: 16,
+            child: GestureDetector(
+              onTap: () => context.read<WindowService>().enterMiniMode(),
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: t.surface,
+                  border: Border.all(color: t.border),
+                ),
+                child: Icon(Icons.picture_in_picture_alt_rounded,
+                    size: 16, color: t.ink2),
               ),
-              child: Icon(Icons.picture_in_picture_alt_rounded,
-                  size: 16, color: t.ink2),
             ),
           ),
-        ),
       ],
     );
   }
@@ -485,13 +487,15 @@ class _TopBar extends StatelessWidget {
           // Right icons — same 36×36 circle style as HomeScreen
           Row(
             children: [
-              _IconBtn(
-                t: t,
-                child: Icon(Icons.picture_in_picture_alt_rounded,
-                    size: 16, color: t.ink2),
-                onTap: () => context.read<WindowService>().enterMiniMode(),
-              ),
-              const SizedBox(width: 8),
+              if (WindowService.isDesktop) ...[
+                _IconBtn(
+                  t: t,
+                  child: Icon(Icons.picture_in_picture_alt_rounded,
+                      size: 16, color: t.ink2),
+                  onTap: () => context.read<WindowService>().enterMiniMode(),
+                ),
+                const SizedBox(width: 8),
+              ],
               _IconBtn(
                 t: t,
                 child: Icon(Icons.close_rounded, size: 16, color: t.ink2),

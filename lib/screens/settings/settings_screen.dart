@@ -174,38 +174,40 @@ class _SettingsBody extends StatelessWidget {
           ],
         ),
 
-        // Window
-        _GroupLabel(t: t, label: 'Window'),
-        _SetGroup(
-          t: t,
-          children: [
-            _ActionRow(
-              t: t,
-              icon: Icons.picture_in_picture_alt_rounded,
-              label: 'Mini mode',
-              subtitle: 'Float as a compact pill overlay',
-              isLast: false,
-              onTap: () {
-                Navigator.of(context).pop();
-                context.read<WindowService>().enterMiniMode();
-              },
-            ),
-            _Separator(t: t),
-            _NavRow(
-              t: t,
-              icon: '◉',
-              iconBg: t.surface2,
-              label: 'System tray',
-              value: settings.desktopTrayMode.label,
-              isLast: true,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const DesktopTraySettingsScreen(),
+        // Window (desktop only)
+        if (WindowService.isDesktop) ...[
+          _GroupLabel(t: t, label: 'Window'),
+          _SetGroup(
+            t: t,
+            children: [
+              _ActionRow(
+                t: t,
+                icon: Icons.picture_in_picture_alt_rounded,
+                label: 'Mini mode',
+                subtitle: 'Float as a compact pill overlay',
+                isLast: false,
+                onTap: () {
+                  Navigator.of(context).pop();
+                  context.read<WindowService>().enterMiniMode();
+                },
+              ),
+              _Separator(t: t),
+              _NavRow(
+                t: t,
+                icon: '◉',
+                iconBg: t.surface2,
+                label: 'System tray',
+                value: settings.desktopTrayMode.label,
+                isLast: true,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const DesktopTraySettingsScreen(),
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
 
         // Account
         _GroupLabel(t: t, label: 'Account'),

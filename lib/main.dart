@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -25,20 +28,21 @@ void main() async {
 
   await Supabase.initialize(url: _supabaseUrl, anonKey: _supabaseAnonKey);
 
-  await windowManager.ensureInitialized();
-
-  const WindowOptions windowOptions = WindowOptions(
-    size: Size(440, 680),
-    minimumSize: Size(300, 500),
-    center: true,
-    title: 'Popodoro',
-    titleBarStyle: TitleBarStyle.normal,
-    skipTaskbar: false,
-  );
-  await windowManager.waitUntilReadyToShow(windowOptions, () async {
-    await windowManager.show();
-    await windowManager.focus();
-  });
+  if (!kIsWeb && (Platform.isMacOS || Platform.isWindows)) {
+    await windowManager.ensureInitialized();
+    const WindowOptions windowOptions = WindowOptions(
+      size: Size(440, 680),
+      minimumSize: Size(300, 500),
+      center: true,
+      title: 'Popodoro',
+      titleBarStyle: TitleBarStyle.normal,
+      skipTaskbar: false,
+    );
+    await windowManager.waitUntilReadyToShow(windowOptions, () async {
+      await windowManager.show();
+      await windowManager.focus();
+    });
+  }
 
   final settings = await SettingsController.load();
   final db = await AppDatabase.open();

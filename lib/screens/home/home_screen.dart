@@ -130,20 +130,22 @@ class _TopBar extends StatelessWidget {
                   child: Icon(Icons.people_rounded, size: 16, color: t.ink2),
                 ),
               ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () => context.read<WindowService>().enterMiniMode(),
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: t.surface,
-                    border: Border.all(color: t.border),
+              if (WindowService.isDesktop) ...[
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () => context.read<WindowService>().enterMiniMode(),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: t.surface,
+                      border: Border.all(color: t.border),
+                    ),
+                    child: Icon(Icons.picture_in_picture_alt_rounded, size: 16, color: t.ink2),
                   ),
-                  child: Icon(Icons.picture_in_picture_alt_rounded, size: 16, color: t.ink2),
                 ),
-              ),
+              ],
               const SizedBox(width: 8),
               GestureDetector(
                 onTap: () => Navigator.of(context).push(

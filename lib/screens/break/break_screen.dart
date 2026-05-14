@@ -191,24 +191,24 @@ class _BreakContent extends StatelessWidget {
         const SizedBox(height: 32),
       ],
         ),
-        // Mini mode button — top right
-        Positioned(
-          top: 12,
-          right: 16,
-          child: GestureDetector(
-            onTap: () => context.read<WindowService>().enterMiniMode(),
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: t.surface,
-                border: Border.all(color: t.border),
+        if (WindowService.isDesktop)
+          Positioned(
+            top: 12,
+            right: 16,
+            child: GestureDetector(
+              onTap: () => context.read<WindowService>().enterMiniMode(),
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: t.surface,
+                  border: Border.all(color: t.border),
+                ),
+                child: Icon(Icons.picture_in_picture_alt_rounded, size: 16, color: t.ink2),
               ),
-              child: Icon(Icons.picture_in_picture_alt_rounded, size: 16, color: t.ink2),
             ),
           ),
-        ),
       ],
     );
   }

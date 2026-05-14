@@ -9,6 +9,10 @@ import '../../models/pomodoro_state.dart';
 import '../../services/together_service.dart';
 import '../../services/window_service.dart';
 
+void _startDragging() {
+  if (WindowService.isDesktop) windowManager.startDragging();
+}
+
 // Compact always-on-top overlay shown in mini (PiP) mode.
 // Fills the 240×80 window completely. Draggable via native window drag.
 class MiniTimerPill extends StatelessWidget {
@@ -29,7 +33,7 @@ class MiniTimerPill extends StatelessWidget {
       final label = room.isOnBreak ? 'SHORT BREAK' : 'TOGETHER';
 
       return GestureDetector(
-        onPanStart: (_) => windowManager.startDragging(),
+        onPanStart: (_) => _startDragging(),
         child: Material(
           color: t.bg,
           child: Container(
@@ -88,7 +92,7 @@ class MiniTimerPill extends StatelessWidget {
     final isRunning = timer.status == TimerStatus.running;
 
     return GestureDetector(
-      onPanStart: (_) => windowManager.startDragging(),
+      onPanStart: (_) => _startDragging(),
       child: Material(
         color: t.bg,
         child: Container(
