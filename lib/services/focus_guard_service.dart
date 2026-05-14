@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
@@ -18,14 +19,18 @@ import '../models/pomodoro_state.dart';
 
 enum GuardStatus { idle, active, noPersonDetected, phoneDetected, cameraError }
 
+enum CameraFailure { permissionDenied, noCamera, other }
+
 // COCO class indices for YOLO (80-class model).
-// If your model uses different indices, change these.
 const _kPersonClass = 0;
 const _kPhoneClass = 67;
 const _kConfidenceThreshold = 0.30;
 
 // Input resolution expected by the model.
 const _kInputSize = 640;
+
+// Method channel for native macOS camera — matches FocusGuardPlugin.swift
+const _kChannel = 'com.popodoro/focus_guard';
 
 // ── Service ────────────────────────────────────────────────────────────────────
 
@@ -42,27 +47,34 @@ class FocusGuardService extends ChangeNotifier {
   final AppDatabase _db;
   TimerController? _timer;
 
+  // macOS native channel
+  static const _channel = MethodChannel(_kChannel);
+
   // Inference
   Interpreter? _interpreter;
-  int _numFeatures = 84; // 4 bbox + 80 classes (auto-detected)
+  int _numFeatures = 84;
   int _numAnchors = 8400;
-  bool _transposedOutput = false; // true if output is [boxes, features]
+  bool _transposedOutput = false;
 
-  // Camera
+  // Camera (mobile / Windows — camera package)
   CameraController? _camera;
   bool _cameraReady = false;
+
+  // macOS native session state
+  bool _macSessionOpen = false;
 
   // Session
   Timer? _checkTimer;
   bool _checking = false;
-  bool _guardPaused = false; // true when we paused the timer
+  bool _guardPaused = false;
   String? _currentSessionId;
 
-  // Current session events (cleared when a new focus session starts)
+  CameraFailure? _lastCameraFailure;
+  CameraFailure? get lastCameraFailure => _lastCameraFailure;
+
   final List<DetectionEventRow> _sessionEvents = [];
   List<DetectionEventRow> get sessionEvents => List.unmodifiable(_sessionEvents);
 
-  // Public state
   GuardStatus _status = GuardStatus.idle;
   GuardStatus get status => _status;
 
@@ -70,9 +82,6 @@ class FocusGuardService extends ChangeNotifier {
 
   // ── Initialization ──────────────────────────────────────────────────────────
 
-  /// Call from FocusGuardScreen to request camera permission and load the model.
-  /// Returns true on success. On macOS/Windows the OS permission dialog is
-  /// triggered here by briefly opening the camera.
   Future<bool> initialize() async {
     final cameraOk = await _requestAndTestCamera();
     if (!cameraOk) {
@@ -89,22 +98,89 @@ class FocusGuardService extends ChangeNotifier {
     return true;
   }
 
-  /// On mobile, shows the permission dialog via permission_handler.
-  /// On macOS/Windows, briefly opens the camera which triggers the OS dialog.
   Future<bool> _requestAndTestCamera() async {
-    if (kIsWeb) return false;
-    if (!Platform.isMacOS && !Platform.isWindows) {
-      final status = await Permission.camera.request();
-      if (!status.isGranted) return false;
+    if (kIsWeb) {
+      _lastCameraFailure = CameraFailure.other;
+      return false;
     }
-    // Probe camera — on macOS this triggers the system permission dialog.
-    return _probeCamera();
+
+    if (Platform.isMacOS) {
+      return _requestAndTestCameraMacOS();
+    }
+
+    // Mobile: use permission_handler
+    if (!Platform.isWindows) {
+      final status = await Permission.camera.request();
+      if (!status.isGranted) {
+        _lastCameraFailure = CameraFailure.permissionDenied;
+        return false;
+      }
+    }
+
+    return _probeCameraMobile();
   }
 
-  Future<bool> _probeCamera() async {
+  // ── macOS native path ───────────────────────────────────────────────────────
+
+  Future<bool> _requestAndTestCameraMacOS() async {
+    try {
+      final String result =
+          await _channel.invokeMethod<String>('requestPermission') ?? 'denied';
+      if (result != 'granted') {
+        _lastCameraFailure = CameraFailure.permissionDenied;
+        return false;
+      }
+      final bool has =
+          await _channel.invokeMethod<bool>('hasCameras') ?? false;
+      if (!has) {
+        _lastCameraFailure = CameraFailure.noCamera;
+        return false;
+      }
+      _lastCameraFailure = null;
+      return true;
+    } on PlatformException catch (e) {
+      debugPrint('[FocusGuard] macOS camera check error: ${e.code} ${e.message}');
+      _lastCameraFailure = CameraFailure.other;
+      return false;
+    }
+  }
+
+  Future<void> _openMacSession() async {
+    if (_macSessionOpen) return;
+    try {
+      await _channel.invokeMethod<void>('openSession');
+      _macSessionOpen = true;
+    } on PlatformException catch (e) {
+      debugPrint('[FocusGuard] openSession error: ${e.code} ${e.message}');
+      if (e.code == 'PERMISSION_DENIED') {
+        _lastCameraFailure = CameraFailure.permissionDenied;
+      } else if (e.code == 'NO_CAMERA') {
+        _lastCameraFailure = CameraFailure.noCamera;
+      } else {
+        _lastCameraFailure = CameraFailure.other;
+      }
+      _status = GuardStatus.cameraError;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _closeMacSession() async {
+    if (!_macSessionOpen) return;
+    try {
+      await _channel.invokeMethod<void>('closeSession');
+    } catch (_) {}
+    _macSessionOpen = false;
+  }
+
+  // ── Mobile camera path ──────────────────────────────────────────────────────
+
+  Future<bool> _probeCameraMobile() async {
     try {
       final cameras = await availableCameras();
-      if (cameras.isEmpty) return false;
+      if (cameras.isEmpty) {
+        _lastCameraFailure = CameraFailure.noCamera;
+        return false;
+      }
       final ctrl = CameraController(
         cameras.first,
         ResolutionPreset.low,
@@ -112,12 +188,29 @@ class FocusGuardService extends ChangeNotifier {
       );
       await ctrl.initialize();
       await ctrl.dispose();
+      _lastCameraFailure = null;
       return true;
+    } on CameraException catch (e) {
+      final code = e.code;
+      if (code == 'CameraAccessDenied' ||
+          code == 'CameraAccessDeniedWithoutPrompt' ||
+          code == 'CameraAccessRestricted' ||
+          code == 'AudioAccessDenied' ||
+          code == 'permissionDenied') {
+        _lastCameraFailure = CameraFailure.permissionDenied;
+      } else {
+        _lastCameraFailure = CameraFailure.other;
+      }
+      debugPrint('[FocusGuard] camera probe failed (${e.code}): ${e.description}');
+      return false;
     } catch (e) {
+      _lastCameraFailure = CameraFailure.other;
       debugPrint('[FocusGuard] camera probe failed: $e');
       return false;
     }
   }
+
+  // ── Model loading ───────────────────────────────────────────────────────────
 
   Future<bool> _loadModel() async {
     try {
@@ -128,18 +221,14 @@ class FocusGuardService extends ChangeNotifier {
       );
       _interpreter!.allocateTensors();
 
-      // Auto-detect output layout.
       final outShape = _interpreter!.getOutputTensor(0).shape;
       debugPrint('[FocusGuard] output shape: $outShape');
       if (outShape.length == 3) {
-        // [batch, A, B] — larger dim is num_anchors
         if (outShape[1] > outShape[2]) {
-          // [1, 8400, 84] — transposed
           _transposedOutput = true;
           _numAnchors = outShape[1];
           _numFeatures = outShape[2];
         } else {
-          // [1, 84, 8400] — standard YOLOv8
           _transposedOutput = false;
           _numFeatures = outShape[1];
           _numAnchors = outShape[2];
@@ -188,7 +277,6 @@ class FocusGuardService extends ChangeNotifier {
       final newSessionId =
           timer.sessionStartTime?.millisecondsSinceEpoch.toString();
       if (newSessionId != _currentSessionId) {
-        // New focus session started — reset state.
         _currentSessionId = newSessionId;
         _sessionEvents.clear();
         _guardPaused = false;
@@ -197,7 +285,6 @@ class FocusGuardService extends ChangeNotifier {
     } else {
       _stopChecking();
       if (!isFocusRunning) _disposeCamera();
-      // Resume if guard had paused and timer phase changed (break started).
       if (_guardPaused && timer.phase != TimerPhase.focus) {
         _guardPaused = false;
       }
@@ -211,6 +298,12 @@ class FocusGuardService extends ChangeNotifier {
   // ── Camera lifecycle ────────────────────────────────────────────────────────
 
   Future<void> _startCamera() async {
+    if (Platform.isMacOS) {
+      await _openMacSession();
+      if (_macSessionOpen) _startCheckLoop();
+      return;
+    }
+
     if (_cameraReady) {
       _startCheckLoop();
       return;
@@ -240,6 +333,10 @@ class FocusGuardService extends ChangeNotifier {
   }
 
   void _disposeCamera() {
+    if (Platform.isMacOS && !kIsWeb) {
+      unawaited(_closeMacSession());
+      return;
+    }
     _camera?.dispose();
     _camera = null;
     _cameraReady = false;
@@ -250,7 +347,7 @@ class FocusGuardService extends ChangeNotifier {
   void _startCheckLoop() {
     if (_checkTimer != null) return;
     _checkTimer = Timer.periodic(const Duration(seconds: 5), (_) => _runCheck());
-    unawaited(_runCheck()); // immediate first check
+    unawaited(_runCheck());
   }
 
   void _stopChecking() {
@@ -262,16 +359,23 @@ class FocusGuardService extends ChangeNotifier {
   Future<void> _runCheck() async {
     final timer = _timer;
     if (timer == null) return;
-    if (_camera == null || !_cameraReady) return;
     if (_interpreter == null) return;
     if (_checking) return;
     _checking = true;
 
     try {
-      final file = await _camera!.takePicture();
-      // TFLite Interpreter is not sendable across isolates — inference on main.
-      final detection = await _runInference(file.path);
-      await File(file.path).delete(); // clean up temp capture
+      _DetectionResult detection;
+
+      if (!kIsWeb && Platform.isMacOS) {
+        detection = await _runCheckMacOS();
+      } else {
+        if (_camera == null || !_cameraReady) return;
+        final file = await _camera!.takePicture();
+        final bytes = await File(file.path).readAsBytes();
+        await File(file.path).delete();
+        detection = await _runInferenceFromBytes(bytes);
+      }
+
       await _handleDetection(detection);
     } catch (e) {
       debugPrint('[FocusGuard] check error: $e');
@@ -280,17 +384,25 @@ class FocusGuardService extends ChangeNotifier {
     }
   }
 
-  Future<_DetectionResult> _runInference(String imagePath) async {
+  Future<_DetectionResult> _runCheckMacOS() async {
     try {
-      final bytes = await File(imagePath).readAsBytes();
+      final data = await _channel.invokeMethod<Uint8List>('captureFrame');
+      if (data == null) return const _DetectionResult(true, false);
+      return _runInferenceFromBytes(data);
+    } on PlatformException catch (e) {
+      debugPrint('[FocusGuard] captureFrame error: ${e.code} ${e.message}');
+      return const _DetectionResult(true, false); // safe: assume person present
+    }
+  }
+
+  Future<_DetectionResult> _runInferenceFromBytes(Uint8List bytes) async {
+    try {
       final decoded = img.decodeImage(bytes);
       if (decoded == null) return const _DetectionResult(false, false);
 
-      // Resize to model input size.
       final resized =
           img.copyResize(decoded, width: _kInputSize, height: _kInputSize);
 
-      // Build uint8 input buffer [1, 640, 640, 3].
       final inputBytes = Uint8List(_kInputSize * _kInputSize * 3);
       var idx = 0;
       for (var y = 0; y < _kInputSize; y++) {
@@ -310,7 +422,7 @@ class FocusGuardService extends ChangeNotifier {
       return _parseOutput(rawOut);
     } catch (e) {
       debugPrint('[FocusGuard] inference error: $e');
-      return const _DetectionResult(true, false); // safe default: assume person present
+      return const _DetectionResult(true, false);
     }
   }
 
@@ -318,7 +430,6 @@ class FocusGuardService extends ChangeNotifier {
     bool personFound = false;
     bool phoneFound = false;
 
-    // Determine class offset — classes start after the 4 bbox values.
     final numClasses = _numFeatures - 4;
     if (numClasses <= 0) return const _DetectionResult(true, false);
 
@@ -326,7 +437,6 @@ class FocusGuardService extends ChangeNotifier {
     final phoneIdx = _kPhoneClass;
 
     if (!_transposedOutput) {
-      // Standard: [features, anchors] — raw[feature * anchors + anchor]
       for (var a = 0; a < _numAnchors; a++) {
         if (personIdx < numClasses) {
           final score = raw[(4 + personIdx) * _numAnchors + a];
@@ -339,7 +449,6 @@ class FocusGuardService extends ChangeNotifier {
         if (personFound && phoneFound) break;
       }
     } else {
-      // Transposed: [anchors, features] — raw[anchor * features + feature]
       for (var a = 0; a < _numAnchors; a++) {
         final base = a * _numFeatures;
         if (personIdx < numClasses) {
@@ -401,7 +510,7 @@ class FocusGuardService extends ChangeNotifier {
     await _db.insertDetectionEvent(row);
   }
 
-  // ── Stats queries (called from stats screen) ────────────────────────────────
+  // ── Stats queries ───────────────────────────────────────────────────────────
 
   Future<List<DetectionSummaryRow>> fetchSummaries({int limit = 30}) =>
       _db.fetchDetectionSummaries(limit: limit);
@@ -426,4 +535,3 @@ class _DetectionResult {
   final bool personPresent;
   final bool phoneDetected;
 }
-

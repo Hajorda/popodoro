@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../controllers/settings_controller.dart';
 import '../../core/theme/app_tokens.dart';
@@ -302,7 +305,7 @@ class _EnableTileState extends State<_EnableTile> {
       final ok = await guard.initialize();
       setState(() => _loading = false);
       if (!ok && context.mounted) {
-        _showPermissionError(context);
+        _showCameraError(context, guard.lastCameraFailure);
         return;
       }
     }
@@ -310,27 +313,182 @@ class _EnableTileState extends State<_EnableTile> {
     settings.focusGuardEnabled = enabling;
   }
 
-  void _showPermissionError(BuildContext context) {
+  void _showCameraError(BuildContext context, CameraFailure? failure) {
     final t = widget.t;
+    final isMac = !Platform.isWindows;
+
+    final String title;
+    final String body;
+    final bool canOpenSettings;
+
+    switch (failure) {
+      case CameraFailure.noCamera:
+        title = 'No camera found';
+        body = 'Focus Guard requires a built-in or connected camera. '
+            'Connect a camera and try again.';
+        canOpenSettings = false;
+      case CameraFailure.permissionDenied:
+        title = 'Camera access denied';
+        body = isMac
+            ? 'Open System Settings → Privacy & Security → Camera '
+                'and enable Popodoro.'
+            : 'Open Windows Settings → Privacy & security → Camera '
+                'and make sure "Let apps access your camera" is on.';
+        canOpenSettings = true;
+      case CameraFailure.other:
+      case null:
+        title = 'Camera unavailable';
+        body = 'Could not access the camera. '
+            '${isMac ? 'Check System Settings → Privacy & Security → Camera.' : 'Check Windows Settings → Privacy & security → Camera.'}';
+        canOpenSettings = true;
+    }
+
     showDialog<void>(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: t.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'Camera permission needed',
-          style: TextStyle(fontFamily: AppFonts.ui, color: t.ink, fontSize: 16, fontWeight: FontWeight.w600),
+      builder: (ctx) => _CameraErrorDialog(
+        t: t,
+        title: title,
+        body: body,
+        canOpenSettings: canOpenSettings,
+        isMac: isMac,
+      ),
+    );
+  }
+}
+
+// ── Camera error dialog ───────────────────────────────────────────────────────
+
+class _CameraErrorDialog extends StatelessWidget {
+  const _CameraErrorDialog({
+    required this.t,
+    required this.title,
+    required this.body,
+    required this.canOpenSettings,
+    required this.isMac,
+  });
+
+  final AppTokens t;
+  final String title;
+  final String body;
+  final bool canOpenSettings;
+  final bool isMac;
+
+  Future<void> _openSettings() async {
+    final uri = Uri.parse(
+      isMac
+          ? 'x-apple.systempreferences:com.apple.preference.security?Privacy_Camera'
+          : 'ms-settings:privacy-webcam',
+    );
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: t.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Icon + title
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: t.ember.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.videocam_off_rounded, size: 20, color: t.ember),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontFamily: AppFonts.ui,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: t.ink,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              body,
+              style: TextStyle(
+                fontFamily: AppFonts.ui,
+                fontSize: 13,
+                color: t.ink2,
+                height: 1.6,
+              ),
+            ),
+            const SizedBox(height: 22),
+            Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: t.surface2,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: t.border),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Close',
+                        style: TextStyle(
+                          fontFamily: AppFonts.ui,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: t.ink2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (canOpenSettings) ...[
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context);
+                        _openSettings();
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: t.ink,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          'Open Settings',
+                          style: TextStyle(
+                            fontFamily: AppFonts.ui,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: t.bg,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
         ),
-        content: Text(
-          'Please allow camera access in System Settings → Privacy & Security → Camera.',
-          style: TextStyle(fontFamily: AppFonts.ui, color: t.ink2, fontSize: 13, height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('OK', style: TextStyle(color: t.pop, fontFamily: AppFonts.ui)),
-          ),
-        ],
       ),
     );
   }
