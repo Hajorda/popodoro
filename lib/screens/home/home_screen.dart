@@ -6,9 +6,12 @@ import '../../controllers/settings_controller.dart';
 import '../../controllers/timer_controller.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../models/pomodoro_state.dart';
+import '../../controllers/project_controller.dart';
+import '../../screens/projects/projects_screen.dart';
 import '../../screens/settings/settings_screen.dart';
 import '../../screens/today/today_screen.dart';
 import '../../screens/together/buddies_screen.dart';
+import '../../widgets/sheets/task_picker_sheet.dart';
 import '../../services/sound_service.dart';
 import '../../services/window_service.dart';
 import '../../widgets/mascot/pop_mascot.dart';
@@ -56,7 +59,9 @@ class _HomeContent extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(22, 0, 22, 0),
           child: _GreetingRow(t: t, timer: timer),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
+        _ProjectTaskRow(t: t, timer: timer),
+        const SizedBox(height: 4),
         if (isFocusIdle)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 22),
@@ -98,6 +103,22 @@ class _TopBar extends StatelessWidget {
           PopWordmark(fontSize: 24, color: t.ink, accentColor: t.pop),
           Row(
             children: [
+              GestureDetector(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(builder: (_) => const ProjectsScreen()),
+                ),
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: t.surface,
+                    border: Border.all(color: t.border),
+                  ),
+                  child: Icon(Icons.folder_outlined, size: 16, color: t.ink2),
+                ),
+              ),
+              const SizedBox(width: 8),
               GestureDetector(
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(builder: (_) => const TodayScreen()),
@@ -426,5 +447,100 @@ class _ActionRow extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+// ── Project / task selector row ───────────────────────────────────────────────
+
+class _ProjectTaskRow extends StatelessWidget {
+  const _ProjectTaskRow({required this.t, required this.timer});
+  final AppTokens t;
+  final TimerController timer;
+
+  @override
+  Widget build(BuildContext context) {
+    final ctrl = context.watch<ProjectController>();
+    final project = ctrl.activeProject;
+    final task = ctrl.activeTask;
+
+    // Only show when idle / focus phase
+    final isRunning = timer.status == TimerStatus.running;
+    if (isRunning) return const SizedBox.shrink();
+
+    final color = project != null
+        ? (_hexToColor(project.color) ?? t.pop)
+        : t.border;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 22),
+      child: GestureDetector(
+        onTap: () => TaskPickerSheet.show(context),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: t.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: t.border),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: project == null
+                    ? Text(
+                        'Select project & task',
+                        style: TextStyle(fontFamily: AppFonts.ui, fontSize: 13, color: t.ink3),
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            project.name,
+                            style: TextStyle(fontFamily: AppFonts.ui, fontSize: 11, color: t.ink3, fontWeight: FontWeight.w600),
+                          ),
+                          if (task != null)
+                            Text(
+                              task.title,
+                              style: TextStyle(fontFamily: AppFonts.ui, fontSize: 13, color: t.ink, fontWeight: FontWeight.w500),
+                              overflow: TextOverflow.ellipsis,
+                            )
+                          else
+                            Text(
+                              'Tap to pick a task',
+                              style: TextStyle(fontFamily: AppFonts.ui, fontSize: 13, color: t.ink3),
+                            ),
+                        ],
+                      ),
+              ),
+              if (project != null)
+                GestureDetector(
+                  onTap: () {
+                    ctrl.clearSelection();
+                    timer.clearProjectTask();
+                  },
+                  child: Icon(Icons.close_rounded, size: 14, color: t.ink3),
+                )
+              else
+                Icon(Icons.chevron_right_rounded, size: 14, color: t.ink3),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Color? _hexToColor(String hex) {
+  try {
+    final h = hex.replaceFirst('#', '');
+    return Color(int.parse('FF$h', radix: 16));
+  } catch (_) {
+    return null;
   }
 }

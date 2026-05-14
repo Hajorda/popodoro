@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'controllers/history_controller.dart';
+import 'controllers/project_controller.dart';
 import 'controllers/settings_controller.dart';
 import 'controllers/timer_controller.dart';
 import 'core/theme/app_theme.dart';
@@ -16,6 +17,8 @@ import 'services/auth_service.dart';
 import 'services/bg_music_service.dart';
 import 'services/desktop_tray_service.dart';
 import 'services/focus_guard_service.dart';
+import 'services/obsidian_service.dart';
+import 'services/project_service.dart';
 import 'services/sound_service.dart';
 import 'services/sync_service.dart';
 import 'services/together_service.dart';
@@ -114,6 +117,20 @@ class _PopodoroAppState extends State<PopodoroApp> {
         ChangeNotifierProvider<TogetherService>(
           create: (_) => TogetherService(),
         ),
+        ChangeNotifierProvider<ObsidianService>(
+          create: (ctx) =>
+              ObsidianService(prefs: ctx.read<SettingsController>().prefs),
+        ),
+        Provider<ProjectService>(
+          create: (_) => ProjectService(widget.db),
+        ),
+        ChangeNotifierProxyProvider<ObsidianService, ProjectController>(
+          create: (ctx) => ProjectController(
+            projectService: ctx.read<ProjectService>(),
+            obsidianService: ctx.read<ObsidianService>(),
+          ),
+          update: (_, __, previous) => previous!,
+        ),
         Provider<SoundService>(
           create: (ctx) => SoundService(ctx.read<SettingsController>()),
           dispose: (_, svc) => svc.dispose(),
@@ -123,6 +140,11 @@ class _PopodoroAppState extends State<PopodoroApp> {
             settings: ctx.read<SettingsController>(),
             onFocusComplete: ctx.read<SoundService>().playConfirmation,
             onSessionComplete: ctx.read<HistoryController>().record,
+            onProjectSessionComplete: (sessionId, duration) =>
+                ctx.read<ProjectController>().onSessionComplete(
+                      sessionId: sessionId,
+                      durationMinutes: duration,
+                    ),
           ),
           update: (_, s, previous) => previous!,
         ),

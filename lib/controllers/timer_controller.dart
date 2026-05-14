@@ -5,7 +5,12 @@ import '../models/session_record.dart';
 import 'settings_controller.dart';
 
 class TimerController extends ChangeNotifier {
-  TimerController({required this.settings, this.onFocusComplete, this.onSessionComplete}) {
+  TimerController({
+    required this.settings,
+    this.onFocusComplete,
+    this.onSessionComplete,
+    this.onProjectSessionComplete,
+  }) {
     settings.addListener(_onSettingsChanged);
   }
 
@@ -17,6 +22,10 @@ class TimerController extends ChangeNotifier {
   // Called with the completed SessionRecord when a focus session ends naturally.
   final void Function(SessionRecord)? onSessionComplete;
 
+  // Called so ProjectController can record the pomodoro against the active task.
+  final Future<void> Function(String sessionId, int durationMinutes)?
+      onProjectSessionComplete;
+
   TimerPhase _phase = TimerPhase.focus;
   TimerStatus _status = TimerStatus.idle;
   int _secondsRemaining = -1;
@@ -24,6 +33,8 @@ class TimerController extends ChangeNotifier {
   int _currentSession = 1;
   String _taskName = '';
   String _tag = '';
+  String? _projectId;
+  String? _taskRef;
   Timer? _ticker;
   DateTime? _sessionStartTime;
 
@@ -115,6 +126,23 @@ class TimerController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setProjectTask({
+    required String? projectId,
+    required String? taskRef,
+    required String? taskName,
+  }) {
+    _projectId = projectId;
+    _taskRef = taskRef;
+    _taskName = taskName ?? '';
+    notifyListeners();
+  }
+
+  void clearProjectTask() {
+    _projectId = null;
+    _taskRef = null;
+    notifyListeners();
+  }
+
   void setCustomFocusMinutes(int minutes) {
     if (_status == TimerStatus.idle || _status == TimerStatus.complete) {
       _secondsRemaining = minutes * 60;
@@ -168,19 +196,28 @@ class TimerController extends ChangeNotifier {
           _completedSessions % settings.sessionsBeforeLongBreak == 0;
       _phase = isCycleComplete ? TimerPhase.longBreak : TimerPhase.shortBreak;
 
-      if (onSessionComplete != null && _sessionStartTime != null) {
+      if (_sessionStartTime != null) {
+        final sessionId = _sessionStartTime!.millisecondsSinceEpoch.toString();
         final durationMinutes = settings.focusMinutes;
-        onSessionComplete!(SessionRecord(
-          id: _sessionStartTime!.millisecondsSinceEpoch.toString(),
+        final record = SessionRecord(
+          id: sessionId,
           startTime: _sessionStartTime!,
           durationMinutes: durationMinutes,
           taskName: _taskName.isNotEmpty ? _taskName : null,
           tag: _tag.isNotEmpty ? _tag : null,
-        ));
+          projectId: _projectId,
+          taskRef: _taskRef,
+        );
+        onSessionComplete?.call(record);
+        if (_projectId != null && _taskRef != null) {
+          onProjectSessionComplete?.call(sessionId, durationMinutes);
+        }
       }
       _sessionStartTime = null;
       _taskName = '';
       _tag = '';
+      _projectId = null;
+      _taskRef = null;
       onFocusComplete?.call();
 
       // Gate: show cycle-complete screen before the long break starts.

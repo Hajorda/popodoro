@@ -91,7 +91,7 @@ class _TimerKernelState extends State<TimerKernel> {
             letterSpacing: 0.14,
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 8),
         SizedBox(
           width: mascotSize,
           height: mascotSize + 18,
@@ -160,7 +160,7 @@ class _TimerKernelState extends State<TimerKernel> {
             ],
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 6),
         Text(
           '$pct% popped',
           style: TextStyle(

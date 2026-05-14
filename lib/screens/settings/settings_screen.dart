@@ -9,11 +9,13 @@ import '../../core/theme/app_tokens.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/pomodoro_state.dart';
 import '../../services/auth_service.dart';
+import '../../services/obsidian_service.dart';
 import '../../services/sync_service.dart';
 import '../../services/update_service.dart';
 import '../../services/window_service.dart';
 import '../../services/bg_music_service.dart';
 import 'account_screen.dart';
+import 'obsidian_settings_screen.dart';
 import 'appearance_screen.dart';
 import 'background_sound_screen.dart';
 import 'desktop_tray_settings_screen.dart';
@@ -247,6 +249,31 @@ class _SettingsBody extends StatelessWidget {
             ],
           ),
         ],
+
+        // Integrations
+        _GroupLabel(t: t, label: 'Integrations'),
+        Consumer<ObsidianService>(
+          builder: (context, obsidian, _) => _SetGroup(
+            t: t,
+            children: [
+              _NavRow(
+                t: t,
+                icon: '◫',
+                iconBg: t.lavender.withValues(alpha: 0.25),
+                label: 'Obsidian',
+                value: obsidian.isConnected
+                    ? '${obsidian.pendingTasks.length} tasks'
+                    : 'not connected',
+                isLast: true,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ObsidianSettingsScreen(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
 
         // Account
         _GroupLabel(t: t, label: 'Account'),

@@ -9,6 +9,8 @@ class SessionRecord {
     required this.durationMinutes,
     this.taskName,
     this.tag,
+    this.projectId,
+    this.taskRef,
   });
 
   final String id;
@@ -16,6 +18,8 @@ class SessionRecord {
   final int durationMinutes;
   final String? taskName;
   final String? tag;
+  final String? projectId;
+  final String? taskRef;
 
   // ── Database bridge ───────────────────────────────────────────────────────────
 
@@ -25,6 +29,8 @@ class SessionRecord {
         durationMinutes: row.durationMinutes,
         taskName: row.taskName,
         tag: row.tag,
+        projectId: row.projectId,
+        taskRef: row.taskRef,
       );
 
   SessionRow toRow({bool synced = false}) => SessionRow(
@@ -33,6 +39,8 @@ class SessionRecord {
         durationMinutes: durationMinutes,
         taskName: taskName,
         tag: tag,
+        projectId: projectId,
+        taskRef: taskRef,
         syncedToCloud: synced,
       );
 
