@@ -19,7 +19,9 @@ import 'services/focus_guard_service.dart';
 import 'services/sound_service.dart';
 import 'services/sync_service.dart';
 import 'services/together_service.dart';
+import 'services/update_service.dart';
 import 'services/window_service.dart';
+import 'widgets/update_dialog.dart';
 
 const _supabaseUrl = 'https://ysbbdxvwittczfrezzlm.supabase.co';
 const _supabaseAnonKey =
@@ -58,7 +60,7 @@ void main() async {
   runApp(PopodoroApp(settings: settings, history: history, db: db, sync: sync));
 }
 
-class PopodoroApp extends StatelessWidget {
+class PopodoroApp extends StatefulWidget {
   const PopodoroApp({
     super.key,
     required this.settings,
@@ -73,12 +75,33 @@ class PopodoroApp extends StatelessWidget {
   final SyncService sync;
 
   @override
+  State<PopodoroApp> createState() => _PopodoroAppState();
+}
+
+class _PopodoroAppState extends State<PopodoroApp> {
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final updateInfo = await UpdateService.checkForUpdate();
+      if (updateInfo != null && _navigatorKey.currentContext != null) {
+        showDialog(
+          context: _navigatorKey.currentContext!,
+          builder: (context) => UpdateDialog(updateInfo: updateInfo),
+        );
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider.value(value: settings),
-        ChangeNotifierProvider.value(value: history),
-        ChangeNotifierProvider.value(value: sync),
+        ChangeNotifierProvider.value(value: widget.settings),
+        ChangeNotifierProvider.value(value: widget.history),
+        ChangeNotifierProvider.value(value: widget.sync),
         // AuthService depends on SyncService, so it comes after.
         ChangeNotifierProxyProvider<SyncService, AuthService>(
           create: (ctx) => AuthService(sync: ctx.read<SyncService>()),
@@ -118,13 +141,13 @@ class PopodoroApp extends StatelessWidget {
           lazy: false,
           create: (ctx) => FocusGuardService(
             settings: ctx.read<SettingsController>(),
-            db: db,
+            db: widget.db,
           ),
           update: (_, settings, timer, previous) {
             (previous ??
                     FocusGuardService(
                       settings: settings,
-                      db: db,
+                      db: widget.db,
                     ))
                 .bindTimer(timer);
             return previous!;
@@ -145,6 +168,7 @@ class PopodoroApp extends StatelessWidget {
       ],
       child: Consumer<SettingsController>(
         builder: (context, s, _) => MaterialApp(
+          navigatorKey: _navigatorKey,
           title: 'Popodoro',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light(),
