@@ -126,8 +126,11 @@ class _PopodoroAppState extends State<PopodoroApp> {
           ),
           update: (_, s, previous) => previous!,
         ),
-        ChangeNotifierProxyProvider2<SettingsController, TimerController,
-            BgMusicService>(
+        ChangeNotifierProxyProvider2<
+          SettingsController,
+          TimerController,
+          BgMusicService
+        >(
           lazy: false,
           create: (ctx) =>
               BgMusicService(settings: ctx.read<SettingsController>()),
@@ -136,25 +139,28 @@ class _PopodoroAppState extends State<PopodoroApp> {
             return previous!;
           },
         ),
-        ChangeNotifierProxyProvider2<SettingsController, TimerController,
-            FocusGuardService>(
+        ChangeNotifierProxyProvider2<
+          SettingsController,
+          TimerController,
+          FocusGuardService
+        >(
           lazy: false,
           create: (ctx) => FocusGuardService(
             settings: ctx.read<SettingsController>(),
             db: widget.db,
           ),
           update: (_, settings, timer, previous) {
-            (previous ??
-                    FocusGuardService(
-                      settings: settings,
-                      db: widget.db,
-                    ))
+            (previous ?? FocusGuardService(settings: settings, db: widget.db))
                 .bindTimer(timer);
             return previous!;
           },
         ),
-        ProxyProvider3<SettingsController, TimerController, TogetherService,
-            DesktopTrayService>(
+        ProxyProvider3<
+          SettingsController,
+          TimerController,
+          TogetherService,
+          DesktopTrayService
+        >(
           lazy: false,
           create: (_) => DesktopTrayService(),
           update: (_, settings, timer, together, previous) =>

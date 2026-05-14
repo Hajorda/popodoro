@@ -6,7 +6,8 @@ import 'package:pub_semver/pub_semver.dart';
 import 'package:xml/xml.dart';
 
 class UpdateService {
-  static const String _appcastUrl = 'https://hajorda.github.io/popodoro/appcast.xml';
+  static const String _appcastUrl =
+      'https://hajorda.github.io/popodoro/appcast.xml';
   static final Dio _dio = Dio();
 
   /// Returns true if a newer version is available.
@@ -17,15 +18,27 @@ class UpdateService {
         final xml = XmlDocument.parse(response.data.toString());
         final item = xml.findAllElements('item').firstOrNull;
         if (item != null) {
-          final versionStr = item.findElements('version').firstOrNull?.innerText;
-          final macosUrl = item.findElements('url_macos').firstOrNull?.innerText;
-          final windowsUrl = item.findElements('url_windows').firstOrNull?.innerText;
-          final releaseNotes = item.findElements('release_notes').firstOrNull?.innerText;
+          final versionStr = item
+              .findElements('version')
+              .firstOrNull
+              ?.innerText;
+          final macosUrl = item
+              .findElements('url_macos')
+              .firstOrNull
+              ?.innerText;
+          final windowsUrl = item
+              .findElements('url_windows')
+              .firstOrNull
+              ?.innerText;
+          final releaseNotes = item
+              .findElements('release_notes')
+              .firstOrNull
+              ?.innerText;
 
           if (versionStr == null) return null;
 
           final remoteVersion = Version.parse(versionStr);
-          
+
           final packageInfo = await PackageInfo.fromPlatform();
           final currentVersion = Version.parse(packageInfo.version);
 

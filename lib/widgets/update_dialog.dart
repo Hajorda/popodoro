@@ -17,10 +17,16 @@ class UpdateDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('A new version (${updateInfo.version}) of Popodoro is available!'),
-            if (updateInfo.releaseNotes != null && updateInfo.releaseNotes!.isNotEmpty) ...[
+            Text(
+              'A new version (${updateInfo.version}) of Popodoro is available!',
+            ),
+            if (updateInfo.releaseNotes != null &&
+                updateInfo.releaseNotes!.isNotEmpty) ...[
               const SizedBox(height: 16),
-              const Text('Release Notes:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text(
+                'Release Notes:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 8),
               Text(updateInfo.releaseNotes!),
             ],
