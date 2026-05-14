@@ -39,4 +39,29 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_macos_build_settings(target)
   end
+
+  # tflite_flutter 0.12.x loads the dylib from Contents/resources/ at runtime
+  # but the podspec does not vendor it. Add a build phase so it is copied on
+  # every flutter run / build from the pub-cache.
+  require 'xcodeproj'
+  proj_path = File.expand_path('../Runner.xcodeproj', __FILE__)
+  project = Xcodeproj::Project.open(proj_path)
+  project.targets.each do |target|
+    next unless target.name == 'Runner'
+    next if target.build_phases.any? { |bp| bp.respond_to?(:name) && bp.name == 'Copy TFLite dylib' }
+
+    phase = target.new_shell_script_build_phase('Copy TFLite dylib')
+    phase.shell_path = '/bin/sh'
+    phase.shell_script = <<~SCRIPT
+      DYLIB=$(find "$HOME/.pub-cache" -path "*/tflite_flutter-*/macos/libtensorflowlite_c-mac.dylib" 2>/dev/null | sort -V | tail -1)
+      if [ -z "$DYLIB" ]; then
+        echo "warning: libtensorflowlite_c-mac.dylib not found in pub-cache - Focus Guard will be disabled"
+        exit 0
+      fi
+      DEST="${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/resources"
+      mkdir -p "$DEST"
+      cp -f "$DYLIB" "$DEST/libtensorflowlite_c-mac.dylib"
+    SCRIPT
+  end
+  project.save
 end

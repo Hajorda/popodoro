@@ -70,11 +70,12 @@ class FocusGuardService extends ChangeNotifier {
 
   // ── Initialization ──────────────────────────────────────────────────────────
 
-  /// Call from FocusGuardScreen to load the model and request camera permission.
-  /// Returns true on success.
+  /// Call from FocusGuardScreen to request camera permission and load the model.
+  /// Returns true on success. On macOS/Windows the OS permission dialog is
+  /// triggered here by briefly opening the camera.
   Future<bool> initialize() async {
-    final granted = await _requestCameraPermission();
-    if (!granted) {
+    final cameraOk = await _requestAndTestCamera();
+    if (!cameraOk) {
       _status = GuardStatus.cameraError;
       notifyListeners();
       return false;
@@ -88,10 +89,34 @@ class FocusGuardService extends ChangeNotifier {
     return true;
   }
 
-  Future<bool> _requestCameraPermission() async {
+  /// On mobile, shows the permission dialog via permission_handler.
+  /// On macOS/Windows, briefly opens the camera which triggers the OS dialog.
+  Future<bool> _requestAndTestCamera() async {
     if (kIsWeb) return false;
-    final status = await Permission.camera.request();
-    return status.isGranted;
+    if (!Platform.isMacOS && !Platform.isWindows) {
+      final status = await Permission.camera.request();
+      if (!status.isGranted) return false;
+    }
+    // Probe camera — on macOS this triggers the system permission dialog.
+    return _probeCamera();
+  }
+
+  Future<bool> _probeCamera() async {
+    try {
+      final cameras = await availableCameras();
+      if (cameras.isEmpty) return false;
+      final ctrl = CameraController(
+        cameras.first,
+        ResolutionPreset.low,
+        enableAudio: false,
+      );
+      await ctrl.initialize();
+      await ctrl.dispose();
+      return true;
+    } catch (e) {
+      debugPrint('[FocusGuard] camera probe failed: $e');
+      return false;
+    }
   }
 
   Future<bool> _loadModel() async {

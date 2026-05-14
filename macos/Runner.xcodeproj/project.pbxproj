@@ -241,6 +241,7 @@
 				33CC110E2044A8840003C045 /* Bundle Framework */,
 				3399D490228B24CF009A79C7 /* ShellScript */,
 				420E3C6669615D665B143CF6 /* [CP] Embed Pods Frameworks */,
+				261BE4D0076B2473FB585B9D /* Copy TFLite dylib */,
 			);
 			buildRules = (
 			);
@@ -323,6 +324,24 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		261BE4D0076B2473FB585B9D /* Copy TFLite dylib */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Copy TFLite dylib";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "DYLIB=$(find \"$HOME/.pub-cache\" -path \"*/tflite_flutter-*/macos/libtensorflowlite_c-mac.dylib\" 2>/dev/null | sort -V | tail -1)\nif [ -z \"$DYLIB\" ]; then\n  echo \"warning: libtensorflowlite_c-mac.dylib not found in pub-cache - Focus Guard will be disabled\"\n  exit 0\nfi\nDEST=\"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/resources\"\nmkdir -p \"$DEST\"\ncp -f \"$DYLIB\" \"$DEST/libtensorflowlite_c-mac.dylib\"\n";
+		};
 		3399D490228B24CF009A79C7 /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
