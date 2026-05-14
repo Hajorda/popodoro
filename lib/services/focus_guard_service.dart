@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
@@ -21,9 +22,11 @@ enum GuardStatus { idle, active, noPersonDetected, phoneDetected, cameraError }
 
 enum CameraFailure { permissionDenied, noCamera, notSupported, other }
 
-const _kPersonClass = 0;
-const _kPhoneClass = 67; // falls back gracefully if model has fewer classes
-const _kConfidenceThreshold = 0.30;
+// Class indices for yolo26n (2-class model: phone=0, person=1).
+// Phone class disabled: too noisy (0.52–0.71 false positives), only track presence.
+const _kPersonClass = 1;
+const _kPhoneClass = 99; // intentionally exceeds numClasses — disables phone detection
+const _kConfidenceThreshold = 0.65;
 
 // Method channel for native macOS camera — matches FocusGuardPlugin.swift
 const _kChannel = 'com.popodoro/focus_guard';
@@ -65,6 +68,8 @@ class FocusGuardService extends ChangeNotifier {
   bool _checking = false;
   bool _guardPaused = false;
   String? _currentSessionId;
+  int _noPersonStreak = 0; // consecutive checks without a person
+  static const _kNoPersonStreakRequired = 2; // 2 × 5s = 10s absence before pause
 
   CameraFailure? _lastCameraFailure;
   CameraFailure? get lastCameraFailure => _lastCameraFailure;
@@ -218,7 +223,7 @@ class FocusGuardService extends ChangeNotifier {
     try {
       _interpreter?.close();
       _interpreter = await Interpreter.fromAsset(
-        'assets/models/yolo26n_int8.tflite',
+        'assets/models/yolo26n_float32.tflite',
         options: InterpreterOptions()..threads = 2,
       );
       _interpreter!.allocateTensors();
@@ -250,7 +255,7 @@ class FocusGuardService extends ChangeNotifier {
         'input=$_inputSize '
         '${_transposedOutput ? "transposed" : "standard"} '
         'anchors=$_numAnchors features=$_numFeatures classes=$numClasses '
-        '(person=class0, phone=class${_kPhoneClass < numClasses ? _kPhoneClass : "n/a"})',
+        '(person=class$_kPersonClass, phone=class${_kPhoneClass < numClasses ? _kPhoneClass : "n/a"})',
       );
       return true;
     } catch (e) {
@@ -293,6 +298,7 @@ class FocusGuardService extends ChangeNotifier {
         _currentSessionId = newSessionId;
         _sessionEvents.clear();
         _guardPaused = false;
+        _noPersonStreak = 0;
       }
       unawaited(_startCamera());
     } else {
@@ -400,11 +406,15 @@ class FocusGuardService extends ChangeNotifier {
   Future<_DetectionResult> _runCheckMacOS() async {
     try {
       final data = await _channel.invokeMethod<Uint8List>('captureFrame');
-      if (data == null) return const _DetectionResult(true, false);
+      if (data == null) {
+        debugPrint('[FocusGuard] captureFrame=nil (no frame yet — video delegate not firing?)');
+        return const _DetectionResult(true, false);
+      }
+      debugPrint('[FocusGuard] captureFrame=${data.length}B');
       return _runInferenceFromBytes(data);
     } on PlatformException catch (e) {
       debugPrint('[FocusGuard] captureFrame error: ${e.code} ${e.message}');
-      return const _DetectionResult(true, false); // safe: assume person present
+      return const _DetectionResult(true, false);
     }
   }
 
@@ -416,26 +426,23 @@ class FocusGuardService extends ChangeNotifier {
       final sz = _inputSize;
       final resized = img.copyResize(decoded, width: sz, height: sz);
 
-      // Float32 input: hybrid int8 models have float32 I/O (int8 weights only).
-      // Values in [0, 255] — normalization is baked into the model graph.
+      // YOLO models trained with Ultralytics/PyTorch expect normalized [0, 1] input.
       final inputFloat = Float32List(sz * sz * 3);
       var idx = 0;
       for (var y = 0; y < sz; y++) {
         for (var x = 0; x < sz; x++) {
           final pixel = resized.getPixel(x, y);
-          inputFloat[idx++] = pixel.r.toDouble();
-          inputFloat[idx++] = pixel.g.toDouble();
-          inputFloat[idx++] = pixel.b.toDouble();
+          inputFloat[idx++] = pixel.r / 255.0;
+          inputFloat[idx++] = pixel.g / 255.0;
+          inputFloat[idx++] = pixel.b / 255.0;
         }
       }
 
-      // Use .data= + .invoke() directly to preserve the 4D tensor shape
-      // set by allocateTensors(). interpreter.run() internally resizes to 1D
-      // which breaks the PAD op (SizeOfDimension 4 != 1).
+      // Use .data= + .invoke() to preserve the 4D tensor shape from allocateTensors().
+      // interpreter.run() reshapes the tensor to 1D which breaks the PAD op.
       _interpreter!.getInputTensor(0).data = inputFloat.buffer.asUint8List();
       _interpreter!.invoke();
 
-      // Output bytes reinterpreted as float32 (row-major, same layout as tensor)
       final raw = _interpreter!.getOutputTensor(0).data.buffer.asFloat32List();
       return _parseOutput(raw);
     } catch (e) {
@@ -444,12 +451,14 @@ class FocusGuardService extends ChangeNotifier {
     }
   }
 
-  // Flat row-major array from TFLite tensor copy:
-  //   transposed [1, anchors, features] → raw[a * features + f]
-  //   standard   [1, features, anchors] → raw[f * anchors + a]
+  // Model outputs raw logits — apply sigmoid to get probability.
+  static double _sig(double x) => 1.0 / (1.0 + math.exp(-x.clamp(-88.0, 88.0)));
+
   _DetectionResult _parseOutput(Float32List raw) {
     bool personFound = false;
     bool phoneFound = false;
+    double maxPersonScore = 0;
+    double maxPhoneScore = 0;
 
     final numClasses = _numFeatures - 4;
     if (numClasses <= 0) return const _DetectionResult(true, false);
@@ -458,24 +467,36 @@ class FocusGuardService extends ChangeNotifier {
       for (var a = 0; a < _numAnchors; a++) {
         final base = a * _numFeatures;
         if (_kPersonClass < numClasses) {
-          if (raw[base + 4 + _kPersonClass] > _kConfidenceThreshold) personFound = true;
+          final s = _sig(raw[base + 4 + _kPersonClass]);
+          if (s > maxPersonScore) maxPersonScore = s;
+          if (s > _kConfidenceThreshold) personFound = true;
         }
         if (_kPhoneClass < numClasses) {
-          if (raw[base + 4 + _kPhoneClass] > _kConfidenceThreshold) phoneFound = true;
+          final s = _sig(raw[base + 4 + _kPhoneClass]);
+          if (s > maxPhoneScore) maxPhoneScore = s;
+          if (s > _kConfidenceThreshold) phoneFound = true;
         }
-        if (personFound && phoneFound) break;
       }
     } else {
       for (var a = 0; a < _numAnchors; a++) {
         if (_kPersonClass < numClasses) {
-          if (raw[(4 + _kPersonClass) * _numAnchors + a] > _kConfidenceThreshold) personFound = true;
+          final s = _sig(raw[(4 + _kPersonClass) * _numAnchors + a]);
+          if (s > maxPersonScore) maxPersonScore = s;
+          if (s > _kConfidenceThreshold) personFound = true;
         }
         if (_kPhoneClass < numClasses) {
-          if (raw[(4 + _kPhoneClass) * _numAnchors + a] > _kConfidenceThreshold) phoneFound = true;
+          final s = _sig(raw[(4 + _kPhoneClass) * _numAnchors + a]);
+          if (s > maxPhoneScore) maxPhoneScore = s;
+          if (s > _kConfidenceThreshold) phoneFound = true;
         }
-        if (personFound && phoneFound) break;
       }
     }
+
+    debugPrint(
+      '[FocusGuard] person=${personFound ? "✓" : "✗"} '
+      'maxP=${maxPersonScore.toStringAsFixed(3)} '
+      '(streak=$_noPersonStreak threshold=$_kConfidenceThreshold)',
+    );
 
     return _DetectionResult(personFound, phoneFound);
   }
@@ -484,8 +505,16 @@ class FocusGuardService extends ChangeNotifier {
     final timer = _timer;
     if (timer == null) return;
 
-    final noPerson = !result.personPresent;
+    final personPresent = result.personPresent;
     final phonePresent = result.phoneDetected;
+
+    if (!personPresent) {
+      _noPersonStreak++;
+    } else {
+      _noPersonStreak = 0;
+    }
+
+    final noPerson = _noPersonStreak >= _kNoPersonStreakRequired;
     final shouldPause = noPerson || phonePresent;
 
     if (shouldPause && timer.status == TimerStatus.running) {
@@ -503,6 +532,7 @@ class FocusGuardService extends ChangeNotifier {
     } else if (!shouldPause && _guardPaused && timer.status == TimerStatus.paused) {
       timer.start();
       _guardPaused = false;
+      _noPersonStreak = 0;
       _status = GuardStatus.active;
       notifyListeners();
     } else if (!shouldPause && _status != GuardStatus.active) {
