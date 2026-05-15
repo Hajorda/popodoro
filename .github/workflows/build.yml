@@ -37,7 +37,7 @@ jobs:
             f = 'macos/Runner.xcodeproj/project.pbxproj'
             c = File.read(f)
             c.gsub!(/CODE_SIGN_STYLE = Automatic;/, 'CODE_SIGN_STYLE = Manual;')
-            c.gsub!(/DEVELOPMENT_TEAM = \S+;/, 'DEVELOPMENT_TEAM = ;')
+            c.gsub!(/DEVELOPMENT_TEAM = \S+;/, 'DEVELOPMENT_TEAM = \"\";')
             File.write(f, c)
           "
 
