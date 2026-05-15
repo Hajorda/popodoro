@@ -3,9 +3,9 @@
   <channel>
     <title>Popodoro Changelog</title>
     <item>
-      <version>1.0.3</version>
-      <url_macos>https://github.com/Hajorda/popodoro/releases/download/v1.0.3/popodoro-macos.zip</url_macos>
-      <url_windows>https://github.com/Hajorda/popodoro/releases/download/v1.0.3/popodoro-1.0.3-windows-installer.exe</url_windows>
+      <version>1.0.4</version>
+      <url_macos>https://github.com/Hajorda/popodoro/releases/download/v1.0.4/popodoro-macos.dmg</url_macos>
+      <url_windows>https://github.com/Hajorda/popodoro/releases/download/v1.0.4/popodoro-1.0.4-windows-installer.exe</url_windows>
       <release_notes>See GitHub for release notes.</release_notes>
     </item>
   </channel>
