@@ -56,13 +56,14 @@ class FocusGuardService extends ChangeNotifier {
     try {
       await _loadModel();
       if (_interpreter != null && !kIsWeb && Platform.isMacOS) {
-        // Check permission without requesting — only open session if already granted.
+        // macOS: check permission without requesting — only open session if already granted.
         final status = await _channel.invokeMethod<String>('requestPermission');
         if (status == 'granted') {
           _lastCameraFailure = null;
-          _onTimerChanged(); // re-evaluate now that model is ready
+          _onTimerChanged();
         }
       } else if (_interpreter != null) {
+        // Windows / mobile: camera_windows / camera package handles permission on first use.
         _onTimerChanged();
       }
     } catch (_) {} finally {
@@ -138,18 +139,16 @@ class FocusGuardService extends ChangeNotifier {
       return _requestAndTestCameraMacOS();
     }
 
-    if (Platform.isWindows) {
-      // camera package has no Windows implementation in this Flutter version.
-      // Upgrading Flutter to Dart >=3.11 and adding camera_desktop would enable it.
-      _lastCameraFailure = CameraFailure.notSupported;
-      return false;
-    }
-
-    // Mobile: use permission_handler
-    final status = await Permission.camera.request();
-    if (!status.isGranted) {
-      _lastCameraFailure = CameraFailure.permissionDenied;
-      return false;
+    // Android / iOS: request camera permission explicitly via permission_handler.
+    // Windows: camera_windows (bundled with camera ^0.10.3) triggers the Windows
+    // privacy prompt automatically when the camera is first initialized — no
+    // permission_handler call needed or supported.
+    if (Platform.isAndroid || Platform.isIOS) {
+      final status = await Permission.camera.request();
+      if (!status.isGranted) {
+        _lastCameraFailure = CameraFailure.permissionDenied;
+        return false;
+      }
     }
 
     return _probeCameraMobile();

@@ -315,7 +315,7 @@ class _EnableTileState extends State<_EnableTile> {
 
   void _showCameraError(BuildContext context, CameraFailure? failure) {
     final t = widget.t;
-    final isMac = !Platform.isWindows;
+    final isWindows = Platform.isWindows;
 
     final String title;
     final String body;
@@ -329,23 +329,25 @@ class _EnableTileState extends State<_EnableTile> {
         canOpenSettings = false;
       case CameraFailure.permissionDenied:
         title = 'Camera access denied';
-        body = isMac
-            ? 'Open System Settings → Privacy & Security → Camera '
-                'and enable Popodoro.'
-            : 'Open Windows Settings → Privacy & security → Camera '
-                'and make sure "Let apps access your camera" is on.';
+        body = isWindows
+            ? 'Open Windows Settings → Privacy & security → Camera '
+                'and make sure "Let apps access your camera" is on.'
+            : 'Open System Settings → Privacy & Security → Camera '
+                'and enable Popodoro.';
         canOpenSettings = true;
       case CameraFailure.notSupported:
-        title = 'Not available on Windows';
-        body = 'Focus Guard camera support on Windows requires upgrading '
-            'to a newer Flutter SDK (Dart ≥ 3.11). '
-            'This will be enabled in a future update.';
+        // Should no longer be reached — kept as a safe fallback.
+        title = 'Camera not supported';
+        body = 'Focus Guard could not access the camera on this device.';
         canOpenSettings = false;
       case CameraFailure.other:
       case null:
         title = 'Camera unavailable';
-        body = 'Could not access the camera. '
-            '${isMac ? 'Check System Settings → Privacy & Security → Camera.' : 'Check Windows Settings → Privacy & security → Camera.'}';
+        body = isWindows
+            ? 'Could not access the camera. Check Windows Settings → '
+                'Privacy & security → Camera.'
+            : 'Could not access the camera. Check System Settings → '
+                'Privacy & Security → Camera.';
         canOpenSettings = true;
     }
 
@@ -356,7 +358,7 @@ class _EnableTileState extends State<_EnableTile> {
         title: title,
         body: body,
         canOpenSettings: canOpenSettings,
-        isMac: isMac,
+        isWindows: isWindows,
       ),
     );
   }
@@ -370,20 +372,20 @@ class _CameraErrorDialog extends StatelessWidget {
     required this.title,
     required this.body,
     required this.canOpenSettings,
-    required this.isMac,
+    required this.isWindows,
   });
 
   final AppTokens t;
   final String title;
   final String body;
   final bool canOpenSettings;
-  final bool isMac;
+  final bool isWindows;
 
   Future<void> _openSettings() async {
     final uri = Uri.parse(
-      isMac
-          ? 'x-apple.systempreferences:com.apple.preference.security?Privacy_Camera'
-          : 'ms-settings:privacy-webcam',
+      isWindows
+          ? 'ms-settings:privacy-webcam'
+          : 'x-apple.systempreferences:com.apple.preference.security?Privacy_Camera',
     );
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
