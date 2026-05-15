@@ -31,13 +31,25 @@ const List<BgTrack> kBgTracks = [
     id: 'white_noise',
     label: 'White noise',
     emoji: '🌊',
-    url: 'https://popodoro.ablt.dev/03-White-Noise-10min.mp3',
+    url: 'https://bucket.ablt.dev/03-White-Noise-10min.mp3',
   ),
   BgTrack(
     id: 'rain',
     label: 'Rain sounds',
     emoji: '🌧',
-    url: 'https://popodoro.ablt.dev/central_park_rain.mp3',
+    url: 'https://bucket.ablt.dev/central_park_rain.mp3',
+  ),
+  BgTrack(
+    id: 'lofi',
+    label: 'Lo-fi hip-hop',
+    emoji: '🎵',
+    url: 'https://bucket.ablt.dev/lofi-hipop.mp3',
+  ),
+  BgTrack(
+    id: 'berserk',
+    label: 'Guts meditation',
+    emoji: '⚔️',
+    url: 'https://bucket.ablt.dev/Berserk-Guts-Meditation-Music.mp3',
   ),
 ];
 
