@@ -53,6 +53,9 @@ jobs:
           # Install Node and appdmg
           npm install -g appdmg
 
+          # Install Python dependencies for DMG background generation
+          pip3 install pillow --break-system-packages || pip3 install pillow
+
           # Build the .dmg
           cd exports/dmg
           bash build.sh
