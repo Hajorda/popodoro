@@ -36,6 +36,10 @@ class SettingsController extends ChangeNotifier {
     required String bgSoundId,
     required double bgVolume,
     required bool focusGuardEnabled,
+    required bool showGreeting,
+    required bool showNudgeCard,
+    required bool showProjectRow,
+    required bool showSessionInfo,
   }) : _prefs = prefs,
        _focusMinutes = focusMinutes,
        _shortBreakMinutes = shortBreakMinutes,
@@ -49,7 +53,11 @@ class SettingsController extends ChangeNotifier {
        _desktopTrayMode = desktopTrayMode,
        _bgSoundId = bgSoundId,
        _bgVolume = bgVolume,
-       _focusGuardEnabled = focusGuardEnabled;
+       _focusGuardEnabled = focusGuardEnabled,
+       _showGreeting = showGreeting,
+       _showNudgeCard = showNudgeCard,
+       _showProjectRow = showProjectRow,
+       _showSessionInfo = showSessionInfo;
 
   // Load from disk. Call once before runApp.
   static Future<SettingsController> load() async {
@@ -71,6 +79,10 @@ class SettingsController extends ChangeNotifier {
       bgSoundId: prefs.getString(_kBgSoundId) ?? '',
       bgVolume: prefs.getDouble(_kBgVolume) ?? 0.4,
       focusGuardEnabled: prefs.getBool(_kFocusGuard) ?? false,
+      showGreeting: prefs.getBool(_kShowGreeting) ?? true,
+      showNudgeCard: prefs.getBool(_kShowNudgeCard) ?? true,
+      showProjectRow: prefs.getBool(_kShowProjectRow) ?? true,
+      showSessionInfo: prefs.getBool(_kShowSessionInfo) ?? true,
     );
   }
 
@@ -88,6 +100,10 @@ class SettingsController extends ChangeNotifier {
   static const _kBgSoundId = 'bgSoundId';
   static const _kBgVolume = 'bgVolume';
   static const _kFocusGuard = 'focusGuardEnabled';
+  static const _kShowGreeting = 'showGreeting';
+  static const _kShowNudgeCard = 'showNudgeCard';
+  static const _kShowProjectRow = 'showProjectRow';
+  static const _kShowSessionInfo = 'showSessionInfo';
 
   final SharedPreferences _prefs;
 
@@ -105,6 +121,10 @@ class SettingsController extends ChangeNotifier {
   String _bgSoundId;
   double _bgVolume;
   bool _focusGuardEnabled;
+  bool _showGreeting;
+  bool _showNudgeCard;
+  bool _showProjectRow;
+  bool _showSessionInfo;
 
   // ── Getters ──────────────────────────────────────────────────────────────────
   SharedPreferences get prefs => _prefs;
@@ -121,6 +141,10 @@ class SettingsController extends ChangeNotifier {
   String get bgSoundId => _bgSoundId;
   double get bgVolume => _bgVolume;
   bool get focusGuardEnabled => _focusGuardEnabled;
+  bool get showGreeting => _showGreeting;
+  bool get showNudgeCard => _showNudgeCard;
+  bool get showProjectRow => _showProjectRow;
+  bool get showSessionInfo => _showSessionInfo;
 
   // Valid option sets used by the UI
   static const focusOptions = [15, 25, 50, 90];
@@ -217,6 +241,34 @@ class SettingsController extends ChangeNotifier {
     if (_focusGuardEnabled == v) return;
     _focusGuardEnabled = v;
     _prefs.setBool(_kFocusGuard, v);
+    notifyListeners();
+  }
+
+  set showGreeting(bool v) {
+    if (_showGreeting == v) return;
+    _showGreeting = v;
+    _prefs.setBool(_kShowGreeting, v);
+    notifyListeners();
+  }
+
+  set showNudgeCard(bool v) {
+    if (_showNudgeCard == v) return;
+    _showNudgeCard = v;
+    _prefs.setBool(_kShowNudgeCard, v);
+    notifyListeners();
+  }
+
+  set showProjectRow(bool v) {
+    if (_showProjectRow == v) return;
+    _showProjectRow = v;
+    _prefs.setBool(_kShowProjectRow, v);
+    notifyListeners();
+  }
+
+  set showSessionInfo(bool v) {
+    if (_showSessionInfo == v) return;
+    _showSessionInfo = v;
+    _prefs.setBool(_kShowSessionInfo, v);
     notifyListeners();
   }
 }

@@ -10,6 +10,7 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
     FocusGuardPlugin.register(with: flutterViewController.registrar(forPlugin: "FocusGuardPlugin"))
+    BookmarkChannel.register(with: flutterViewController.registrar(forPlugin: "BookmarkChannel"))
 
     super.awakeFromNib()
   }

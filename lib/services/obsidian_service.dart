@@ -7,6 +7,8 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'bookmark_service.dart';
+
 // A single task parsed from an Obsidian markdown file.
 class ObsidianTask {
   const ObsidianTask({
@@ -48,19 +50,16 @@ class ObsidianTask {
 
 class ObsidianService extends ChangeNotifier {
   ObsidianService({required SharedPreferences prefs}) : _prefs = prefs {
-    final saved = prefs.getString(_kVaultPath);
-    if (saved != null && Directory(saved).existsSync()) {
-      _vaultPath = saved;
-      _startWatcher();
-      _scanVault();
-    }
+    _restoreVault();
   }
 
+  // ── Prefs keys ────────────────────────────────────────────────────────────────
   static const _kVaultPath = 'obsidian_vault_path';
+  // Stores the security-scoped bookmark as a base64 string (macOS only).
+  static const _kVaultBookmark = 'obsidian_vault_bookmark';
 
   // - [ ] task description [popcorn:: actual/expected]
   // - [x] completed task   [popcorn:: actual]
-  // Using 'popcorn' instead of tomato to match the Popodoro design system.
   static final _taskRe = RegExp(
     r'^(\s*)-\s*\[([ xX])\]\s+(.+?)(?:\s*\[popcorn::\s*(\d+)(?:\/(\d+))?\])?$',
   );
@@ -78,24 +77,69 @@ class ObsidianService extends ChangeNotifier {
   List<ObsidianTask> get pendingTasks =>
       _tasks.where((t) => !t.isChecked).toList();
 
+  // ── Boot: restore vault from bookmark / path ──────────────────────────────────
+
+  Future<void> _restoreVault() async {
+    final bookmark = _prefs.getString(_kVaultBookmark);
+    final savedPath = _prefs.getString(_kVaultPath);
+
+    if (bookmark != null) {
+      // Preferred path: resolve the security-scoped bookmark.
+      final result = await BookmarkService.resolveBookmark(bookmark);
+      if (result != null) {
+        _vaultPath = result.path;
+
+        // Bookmark is stale (folder moved/renamed) — recreate it while we have
+        // access so the next launch works too.
+        if (result.stale) {
+          final fresh = await BookmarkService.createBookmark(result.path);
+          if (fresh != null) await _prefs.setString(_kVaultBookmark, fresh);
+        }
+
+        _startWatcher();
+        await _scanVault();
+        return;
+      }
+      // Bookmark resolve failed — fall through and clear stale data.
+      await _prefs.remove(_kVaultBookmark);
+    }
+
+    // Fallback for non-macOS or first launch before bookmark was created.
+    if (savedPath != null && Directory(savedPath).existsSync()) {
+      _vaultPath = savedPath;
+      _startWatcher();
+      await _scanVault();
+    }
+  }
+
   // ── Vault management ──────────────────────────────────────────────────────────
 
   Future<void> connectVault(String path) async {
     if (!Directory(path).existsSync()) return;
     _vaultPath = path;
     await _prefs.setString(_kVaultPath, path);
+
+    // Create a security-scoped bookmark so access survives future relaunches.
+    final bookmark = await BookmarkService.createBookmark(path);
+    if (bookmark != null) {
+      await _prefs.setString(_kVaultBookmark, bookmark);
+    }
+
     _startWatcher();
     await _scanVault();
     notifyListeners();
   }
 
   Future<void> disconnectVault() async {
+    final path = _vaultPath;
     _watcher?.cancel();
     _watcher = null;
     _debounce?.cancel();
     _vaultPath = null;
     _tasks = [];
     await _prefs.remove(_kVaultPath);
+    await _prefs.remove(_kVaultBookmark);
+    if (path != null) await BookmarkService.stopAccessing(path);
     notifyListeners();
   }
 
@@ -105,9 +149,8 @@ class ObsidianService extends ChangeNotifier {
 
   // Lets the user pick one or more .md files from the vault for a project.
   Future<List<String>> pickFiles() async {
-    final path = _vaultPath;
     final results = await openFiles(
-      initialDirectory: path,
+      initialDirectory: _vaultPath,
       acceptedTypeGroups: [
         const XTypeGroup(label: 'Markdown', extensions: ['md']),
       ],
@@ -145,12 +188,10 @@ class ObsidianService extends ChangeNotifier {
     String newLine;
 
     if (task.expectedPomodoros > 0) {
-      // Replace existing [popcorn:: n/m]
       newLine = line.replaceFirst(
         RegExp(r'\[popcorn::\s*\d+\/\d+\]'),
         '[popcorn:: $newCount/${task.expectedPomodoros}]',
       );
-      // If no match (actual-only field), replace [popcorn:: n]
       if (newLine == line) {
         newLine = line.replaceFirst(
           RegExp(r'\[popcorn::\s*\d+\]'),
@@ -163,14 +204,12 @@ class ObsidianService extends ChangeNotifier {
         '[popcorn:: $newCount]',
       );
     } else {
-      // No existing field — append it before any trailing whitespace
       newLine = '${line.trimRight()} [popcorn:: $newCount]';
     }
 
     lines[task.lineIndex] = newLine;
     await _writeAtomic(file, lines);
 
-    // Update in-memory list without full rescan
     final idx = _tasks.indexWhere(
       (t) => t.filePath == task.filePath && t.lineIndex == task.lineIndex,
     );
@@ -203,16 +242,21 @@ class ObsidianService extends ChangeNotifier {
     if (!dir.existsSync()) return;
 
     final results = <ObsidianTask>[];
-    await for (final entity in dir.list(recursive: true, followLinks: false)) {
-      if (entity is File && entity.path.endsWith('.md')) {
-        // Skip hidden dirs (e.g. .obsidian, .git)
-        if (_isHiddenPath(entity.path, path)) continue;
-        try {
-          results.addAll(await scanFile(entity.path));
-        } catch (_) {
-          // Skip unreadable files silently
+    try {
+      await for (final entity in dir.list(recursive: true, followLinks: false)) {
+        if (entity is File && entity.path.endsWith('.md')) {
+          if (_isHiddenPath(entity.path, path)) continue;
+          try {
+            results.addAll(await scanFile(entity.path));
+          } catch (_) {
+            // Skip unreadable files silently
+          }
         }
       }
+    } on PathAccessException {
+      // Sandbox revoked access — clear everything and let the user reconnect.
+      await _hardReset();
+      return;
     }
 
     _tasks = results;
@@ -231,7 +275,6 @@ class ObsidianService extends ChangeNotifier {
       final title = match.group(3)!.trim();
       final actual = int.tryParse(match.group(4) ?? '') ?? 0;
       final expected = int.tryParse(match.group(5) ?? '') ?? 0;
-
       final blockRef = _makeBlockRef(filePath, title);
 
       tasks.add(ObsidianTask(
@@ -250,7 +293,7 @@ class ObsidianService extends ChangeNotifier {
     return tasks;
   }
 
-  // SHA-1 of filePath+title, hex-encoded — stable even if line number shifts.
+  // SHA-1 of filePath+title — stable even if line number shifts.
   String _makeBlockRef(String filePath, String title) {
     final bytes = utf8.encode('$filePath|$title');
     return sha1.convert(bytes).toString();
@@ -271,11 +314,29 @@ class ObsidianService extends ChangeNotifier {
     _watcher = Directory(path)
         .watch(recursive: true)
         .where((e) => e.path.endsWith('.md'))
-        .listen((_) {
-      // Debounce rapid saves (e.g. Obsidian auto-save on every keystroke)
-      _debounce?.cancel();
-      _debounce = Timer(const Duration(milliseconds: 600), _scanVault);
-    });
+        .listen(
+          (_) {
+            _debounce?.cancel();
+            _debounce = Timer(const Duration(milliseconds: 600), _scanVault);
+          },
+          onError: (_) {
+            // Watcher error (e.g. directory deleted) — ignore, next scan handles it.
+          },
+        );
+  }
+
+  // Full reset when sandbox access is revoked — stops the resource and clears prefs.
+  Future<void> _hardReset() async {
+    _watcher?.cancel();
+    _watcher = null;
+    _debounce?.cancel();
+    final path = _vaultPath;
+    _vaultPath = null;
+    _tasks = [];
+    await _prefs.remove(_kVaultPath);
+    await _prefs.remove(_kVaultBookmark);
+    if (path != null) await BookmarkService.stopAccessing(path);
+    notifyListeners();
   }
 
   // Atomic write: write to .tmp then rename, preventing partial file writes.
@@ -289,6 +350,10 @@ class ObsidianService extends ChangeNotifier {
   void dispose() {
     _watcher?.cancel();
     _debounce?.cancel();
+    // Stop accessing the security-scoped resource when the service is torn down.
+    if (_vaultPath != null) {
+      BookmarkService.stopAccessing(_vaultPath!);
+    }
     super.dispose();
   }
 }

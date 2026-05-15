@@ -4,6 +4,7 @@ import '../../core/theme/app_typography.dart';
 
 import '../../controllers/settings_controller.dart';
 import '../../controllers/timer_controller.dart';
+import '../../screens/settings/timer_settings_screen.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../models/pomodoro_state.dart';
 import '../../controllers/project_controller.dart';
@@ -50,19 +51,22 @@ class _HomeContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final isFocusIdle =
         timer.status == TimerStatus.idle && timer.phase == TimerPhase.focus;
+    final settings = context.watch<SettingsController>();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _TopBar(t: t),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(22, 0, 22, 0),
-          child: _GreetingRow(t: t, timer: timer),
-        ),
+        if (settings.showGreeting)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(22, 0, 22, 0),
+            child: _GreetingRow(t: t, timer: timer),
+          ),
         const SizedBox(height: 8),
-        _ProjectTaskRow(t: t, timer: timer),
-        const SizedBox(height: 4),
-        if (isFocusIdle)
+        if (settings.showProjectRow)
+          _ProjectTaskRow(t: t, timer: timer),
+        if (settings.showNudgeCard && isFocusIdle) ...[
+          const SizedBox(height: 4),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 22),
             child: NudgeCard(
@@ -75,9 +79,11 @@ class _HomeContent extends StatelessWidget {
               ink2Color: t.ink2,
             ),
           ),
+        ],
         const SizedBox(height: 4),
         Expanded(child: _TimerCenter(timer: timer, t: t)),
-        _SessionInfo(timer: timer, t: t),
+        if (settings.showSessionInfo)
+          _SessionInfo(timer: timer, t: t),
         const SizedBox(height: 20),
         _ActionRow(timer: timer, t: t),
         const SizedBox(height: 28),
@@ -286,30 +292,35 @@ class _TimerCenter extends StatelessWidget {
     return LayoutBuilder(builder: (context, c) {
       final size = (c.maxWidth * 0.78).clamp(200.0, 320.0);
       return Center(
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 280),
-          switchInCurve: Curves.easeOut,
-          switchOutCurve: Curves.easeIn,
-          transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
-          child: KeyedSubtree(
-            key: ValueKey(appearance),
-            child: TimerDisplay(
-              appearance: appearance,
-              progress: timer.progress,
-              timeDisplay: timer.timeDisplay,
-              sessionLabel: timer.sessionDisplay,
-              taskName: timer.taskName.isNotEmpty ? timer.taskName : null,
-              ringColor: _accentColor,
-              trackColor: t.surface2,
-              inkColor: t.ink,
-              ink2Color: t.ink2,
-              ink3Color: t.ink3,
-              surfaceColor: t.surface,
-              borderColor: t.border,
-              bumpColor: t.bump,
-              bumpEdgeColor: t.bumpEdge,
-              size: size,
-              strokeWidth: size * 0.045,
+        child: GestureDetector(
+          onLongPress: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const TimerSettingsScreen()),
+          ),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 280),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
+            child: KeyedSubtree(
+              key: ValueKey(appearance),
+              child: TimerDisplay(
+                appearance: appearance,
+                progress: timer.progress,
+                timeDisplay: timer.timeDisplay,
+                sessionLabel: timer.sessionDisplay,
+                taskName: timer.taskName.isNotEmpty ? timer.taskName : null,
+                ringColor: _accentColor,
+                trackColor: t.surface2,
+                inkColor: t.ink,
+                ink2Color: t.ink2,
+                ink3Color: t.ink3,
+                surfaceColor: t.surface,
+                borderColor: t.border,
+                bumpColor: t.bump,
+                bumpEdgeColor: t.bumpEdge,
+                size: size,
+                strokeWidth: size * 0.045,
+              ),
             ),
           ),
         ),

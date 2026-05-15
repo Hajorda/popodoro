@@ -83,6 +83,11 @@ class _Body extends StatelessWidget {
         // Timer style
         _Label(t: t, label: 'Timer style'),
         _TimerStyleGrid(t: t, settings: settings),
+        const SizedBox(height: 22),
+
+        // Home screen visibility
+        _Label(t: t, label: 'Home screen'),
+        _ToggleGroup(t: t, settings: settings),
       ],
     );
   }
@@ -326,6 +331,109 @@ class _RingThumbPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_RingThumbPainter old) => false;
+}
+
+// ── Home screen toggle group ──────────────────────────────────────────────────
+
+class _ToggleGroup extends StatelessWidget {
+  const _ToggleGroup({required this.t, required this.settings});
+  final AppTokens t;
+  final SettingsController settings;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: t.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: t.border),
+      ),
+      child: Column(
+        children: [
+          _ToggleRow(
+            t: t,
+            label: 'Greeting & date',
+            subtitle: 'Mascot, greeting text, and date',
+            value: settings.showGreeting,
+            onChanged: (v) => settings.showGreeting = v,
+          ),
+          Divider(height: 1, color: t.border, indent: 16),
+          _ToggleRow(
+            t: t,
+            label: 'Smart nudge',
+            subtitle: '"You\'re usually a beast at…" card',
+            value: settings.showNudgeCard,
+            onChanged: (v) => settings.showNudgeCard = v,
+          ),
+          Divider(height: 1, color: t.border, indent: 16),
+          _ToggleRow(
+            t: t,
+            label: 'Project & task',
+            subtitle: 'Project and task selector pill',
+            value: settings.showProjectRow,
+            onChanged: (v) => settings.showProjectRow = v,
+          ),
+          Divider(height: 1, color: t.border, indent: 16),
+          _ToggleRow(
+            t: t,
+            label: 'Session info',
+            subtitle: 'Session counter and task name below timer',
+            value: settings.showSessionInfo,
+            onChanged: (v) => settings.showSessionInfo = v,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ToggleRow extends StatelessWidget {
+  const _ToggleRow({
+    required this.t,
+    required this.label,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+  final AppTokens t;
+  final String label;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(fontFamily: AppFonts.ui, fontSize: 14, fontWeight: FontWeight.w500, color: t.ink),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(fontFamily: AppFonts.ui, fontSize: 12, color: t.ink3, height: 1.3),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeThumbColor: t.pop,
+            activeTrackColor: t.pop.withValues(alpha: 0.35),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
