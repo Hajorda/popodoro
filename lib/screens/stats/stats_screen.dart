@@ -288,12 +288,13 @@ class _BarChart extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: entries.map((e) {
-              return SizedBox(
-                width: entries.length <= 7 ? 32 : null,
-                child: Flexible(
+              return Flexible(
+                child: SizedBox(
+                  width: entries.length <= 7 ? 32 : null,
                   child: Text(
                     e.label,
                     textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontFamily: AppFonts.mono,
                       fontSize: 9,
