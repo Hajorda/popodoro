@@ -78,7 +78,10 @@ class ProjectController extends ChangeNotifier {
     notifyListeners();
 
     if (!project.isObsidian) {
-      _nativeTasks = await _projectService.fetchTasks(project.id);
+      final projectId = project.id;
+      final tasks = await _projectService.fetchTasks(projectId);
+      if (_activeProject?.id != projectId) return;
+      _nativeTasks = tasks;
       notifyListeners();
     }
   }
@@ -232,8 +235,17 @@ class ProjectController extends ChangeNotifier {
 
   void _onObsidianChanged() => notifyListeners();
 
+  bool _disposed = false;
+
+  @override
+  void notifyListeners() {
+    if (_disposed) return;
+    super.notifyListeners();
+  }
+
   @override
   void dispose() {
+    _disposed = true;
     _obsidianService.removeListener(_onObsidianChanged);
     super.dispose();
   }

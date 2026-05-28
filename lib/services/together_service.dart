@@ -167,6 +167,14 @@ class TogetherReaction {
 }
 
 class TogetherService extends ChangeNotifier {
+  TogetherService() {
+    _authSub = _client.auth.onAuthStateChange.listen((state) {
+      if (state.session == null && _room != null) {
+        unawaited(leaveRoom());
+      }
+    });
+  }
+
   SupabaseClient get _client => Supabase.instance.client;
 
   TogetherRoom? _room;
@@ -174,6 +182,7 @@ class TogetherService extends ChangeNotifier {
   List<TogetherReaction> _recentReactions = [];
   RealtimeChannel? _channel;
   Timer? _ticker;
+  StreamSubscription<AuthState>? _authSub;
 
   bool _loading = false;
   String? _error;
@@ -232,7 +241,7 @@ class TogetherService extends ChangeNotifier {
         });
 
         await _refreshParticipants();
-        _subscribeToRoom(_room!.id);
+        await _subscribeToRoom(_room!.id);
       });
 
   Future<bool> joinRoom(String code) => _run(() async {
@@ -255,7 +264,7 @@ class TogetherService extends ChangeNotifier {
         }, onConflict: 'room_id,user_id');
 
         await _refreshParticipants();
-        _subscribeToRoom(_room!.id);
+        await _subscribeToRoom(_room!.id);
       });
 
   Future<void> setReady() async {
@@ -296,7 +305,9 @@ class TogetherService extends ChangeNotifier {
   /// Host → pauses the focus timer.
   Future<void> pauseSession() async {
     if (_room == null || !isHost || !_room!.isFocusing) return;
-    final elapsed = DateTime.now().difference(_room!.startedAt!).inSeconds;
+    final startedAt = _room!.startedAt;
+    if (startedAt == null) return;
+    final elapsed = DateTime.now().difference(startedAt).inSeconds;
     await _client.from('rooms').update({
       'status': 'paused',
       'elapsed_seconds': elapsed,
@@ -370,7 +381,7 @@ class TogetherService extends ChangeNotifier {
   Future<void> leaveRoom() async {
     _ticker?.cancel();
     _ticker = null;
-    _unsubscribe();
+    await _unsubscribe();
     if (_room != null && myUserId != null) {
       try {
         await _client
@@ -400,8 +411,8 @@ class TogetherService extends ChangeNotifier {
         .toList();
   }
 
-  void _subscribeToRoom(String roomId) {
-    _unsubscribe();
+  Future<void> _subscribeToRoom(String roomId) async {
+    await _unsubscribe();
     _channel = _client
         .channel('together:$roomId')
         .onPostgresChanges(
@@ -445,7 +456,9 @@ class TogetherService extends ChangeNotifier {
   }
 
   void _onParticipantChange(PostgresChangePayload payload) {
-    _refreshParticipants().then((_) => notifyListeners());
+    _refreshParticipants().then((_) => notifyListeners()).catchError((e) {
+      debugPrint('[TogetherService] refresh participants error: $e');
+    });
   }
 
   void _onReaction(PostgresChangePayload payload) {
@@ -467,10 +480,15 @@ class TogetherService extends ChangeNotifier {
     }
   }
 
-  void _unsubscribe() {
-    if (_channel != null) {
-      _client.removeChannel(_channel!);
+  Future<void> _unsubscribe() async {
+    final ch = _channel;
+    if (ch != null) {
       _channel = null;
+      try {
+        await _client.removeChannel(ch);
+      } catch (e) {
+        debugPrint('[TogetherService] removeChannel error: $e');
+      }
     }
   }
 
@@ -501,7 +519,8 @@ class TogetherService extends ChangeNotifier {
   @override
   void dispose() {
     _ticker?.cancel();
-    _unsubscribe();
+    _authSub?.cancel();
+    unawaited(_unsubscribe());
     super.dispose();
   }
 }
