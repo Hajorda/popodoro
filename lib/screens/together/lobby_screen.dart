@@ -18,6 +18,7 @@ class LobbyScreen extends StatefulWidget {
 
 class _LobbyScreenState extends State<LobbyScreen> {
   bool _codeCopied = false;
+  bool _navigated = false;
 
   @override
   void didChangeDependencies() {
@@ -30,7 +31,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
   }
 
   void _goToFocus() {
-    if (!mounted) return;
+    if (!mounted || _navigated) return;
+    _navigated = true;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(builder: (_) => const CoFocusScreen()),
     );
@@ -38,6 +40,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
   Future<void> _copyCode(String code) async {
     await Clipboard.setData(ClipboardData(text: code));
+    if (!mounted) return;
     setState(() => _codeCopied = true);
     await Future<void>.delayed(const Duration(seconds: 2));
     if (mounted) setState(() => _codeCopied = false);

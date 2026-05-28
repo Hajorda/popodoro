@@ -79,6 +79,7 @@ class BgMusicService extends ChangeNotifier {
   bool _isSyncing = false;
   bool _pendingSync = false;
   bool _previewing = false;
+  int _previewToken = 0;
 
   // ── Public state ───────────────────────────────────────────────────────────
 
@@ -102,11 +103,12 @@ class BgMusicService extends ChangeNotifier {
   // ── Preview API (settings screen) ─────────────────────────────────────────
 
   Future<void> previewTrack(String trackId) async {
+    final token = ++_previewToken;
     _previewing = true;
     notifyListeners();
     final track = kBgTracks.where((t) => t.id == trackId).firstOrNull;
     if (track == null) { _previewing = false; notifyListeners(); return; }
-    await _loadAndPlay(track);
+    await _loadAndPlay(track, previewToken: token);
   }
 
   Future<void> stopPreview() async {
@@ -164,8 +166,14 @@ class BgMusicService extends ChangeNotifier {
     } on DioException catch (e) {
       _progress.remove(track.id);
       _tokens.remove(track.id);
-      // Remove partial file so a retry starts fresh.
-      if (file.existsSync()) file.deleteSync();
+      // Remove partial file so a retry starts fresh. On Windows the file may
+      // still be locked by the Dio write handle for a moment — swallow the
+      // exception rather than escaping the catch block.
+      if (file.existsSync()) {
+        try {
+          file.deleteSync();
+        } catch (_) {}
+      }
       notifyListeners();
       if (e.type != DioExceptionType.cancel) {
         debugPrint('[BgMusic] download error for ${track.id}: $e');
@@ -224,7 +232,7 @@ class BgMusicService extends ChangeNotifier {
     }
   }
 
-  Future<void> _loadAndPlay(BgTrack track) async {
+  Future<void> _loadAndPlay(BgTrack track, {int? previewToken}) async {
     await _player.stop();
     _isPlaying = false;
 
@@ -233,6 +241,8 @@ class BgMusicService extends ChangeNotifier {
 
     // Check if selection changed while we were downloading.
     if (!_previewing && _settings.bgSoundId != track.id) return;
+    // For previews, ensure a newer preview hasn't superseded this one.
+    if (previewToken != null && previewToken != _previewToken) return;
 
     _loadedTrackId = track.id;
     await _player.setVolume(_settings.bgVolume);

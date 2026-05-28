@@ -8,7 +8,29 @@ import 'package:xml/xml.dart';
 class UpdateService {
   static const String _appcastUrl =
       'https://hajorda.github.io/popodoro/appcast.xml';
-  static final Dio _dio = Dio();
+  static final Dio _dio = Dio(BaseOptions(
+    connectTimeout: const Duration(seconds: 10),
+    receiveTimeout: const Duration(seconds: 10),
+  ));
+
+  // pub_semver's Version.parse requires MAJOR.MINOR.PATCH and throws on anything
+  // else. Pad short versions and strip stray whitespace + `+build` suffixes so a
+  // malformed appcast or pubspec version doesn't silently kill the update check.
+  static Version? _tryParseVersion(String? raw) {
+    if (raw == null) return null;
+    var v = raw.trim();
+    if (v.isEmpty) return null;
+    final plus = v.indexOf('+');
+    if (plus != -1) v = v.substring(0, plus);
+    final parts = v.split('.');
+    if (parts.length == 1) v = '$v.0.0';
+    if (parts.length == 2) v = '$v.0';
+    try {
+      return Version.parse(v);
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Returns true if a newer version is available.
   static Future<UpdateInfo?> checkForUpdate() async {
@@ -37,10 +59,12 @@ class UpdateService {
 
           if (versionStr == null) return null;
 
-          final remoteVersion = Version.parse(versionStr);
+          final remoteVersion = _tryParseVersion(versionStr);
+          if (remoteVersion == null) return null;
 
           final packageInfo = await PackageInfo.fromPlatform();
-          final currentVersion = Version.parse(packageInfo.version);
+          final currentVersion = _tryParseVersion(packageInfo.version);
+          if (currentVersion == null) return null;
 
           if (remoteVersion > currentVersion) {
             String? downloadUrl;

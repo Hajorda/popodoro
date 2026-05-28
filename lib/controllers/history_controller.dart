@@ -276,4 +276,18 @@ class HistoryController extends ChangeNotifier {
       a.year == b.year && a.month == b.month && a.day == b.day;
 
   static String _dayKey(DateTime d) => '${d.year}-${d.month}-${d.day}';
+
+  bool _disposed = false;
+
+  @override
+  void notifyListeners() {
+    if (_disposed) return;
+    super.notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
 }

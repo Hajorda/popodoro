@@ -38,8 +38,9 @@ class SyncService extends ChangeNotifier {
   /// Called after each new session and on app resume.
   /// No-op when the user is not signed in.
   Future<void> requestSync() async {
+    if (_syncing) return;
     await _refreshPendingCount();
-    if (!isSignedIn || _syncing) return;
+    if (!isSignedIn) return;
     await _upload();
   }
 
@@ -63,14 +64,15 @@ class SyncService extends ChangeNotifier {
   }
 
   Future<void> _upload() async {
-    final unsynced = await _db.fetchUnsynced();
-    if (unsynced.isEmpty) return;
-
+    if (_syncing) return;
     _syncing = true;
     _lastError = null;
     notifyListeners();
 
     try {
+      final unsynced = await _db.fetchUnsynced();
+      if (unsynced.isEmpty) return;
+
       final userId = _client.auth.currentUser!.id;
 
       final payload = unsynced

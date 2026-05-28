@@ -42,6 +42,9 @@ class TimerController extends ChangeNotifier {
   // SessionCompleteScreen can be shown before transitioning to long break.
   bool _awaitingCycleAck = false;
 
+  // When set, overrides settings.focusMinutes for the next focus phase only.
+  int? _customFocusSeconds;
+
   // ── Getters ─────────────────────────────────────────────────────────────────
 
   TimerPhase get phase => _phase;
@@ -55,7 +58,8 @@ class TimerController extends ChangeNotifier {
 
   int get totalSecondsForPhase {
     switch (_phase) {
-      case TimerPhase.focus: return settings.focusMinutes * 60;
+      case TimerPhase.focus:
+        return _customFocusSeconds ?? settings.focusMinutes * 60;
       case TimerPhase.shortBreak: return settings.shortBreakMinutes * 60;
       case TimerPhase.longBreak: return settings.longBreakMinutes * 60;
     }
@@ -111,8 +115,8 @@ class TimerController extends ChangeNotifier {
   }
 
   void addMinutes(int minutes) {
-    _secondsRemaining = (secondsRemaining + minutes * 60)
-        .clamp(0, totalSecondsForPhase + minutes * 60);
+    const maxSeconds = 8 * 60 * 60;
+    _secondsRemaining = (secondsRemaining + minutes * 60).clamp(0, maxSeconds);
     notifyListeners();
   }
 
@@ -140,12 +144,14 @@ class TimerController extends ChangeNotifier {
   void clearProjectTask() {
     _projectId = null;
     _taskRef = null;
+    _taskName = '';
     notifyListeners();
   }
 
   void setCustomFocusMinutes(int minutes) {
     if (_status == TimerStatus.idle || _status == TimerStatus.complete) {
-      _secondsRemaining = minutes * 60;
+      _customFocusSeconds = minutes * 60;
+      _secondsRemaining = _customFocusSeconds!;
       notifyListeners();
     }
   }
@@ -198,7 +204,8 @@ class TimerController extends ChangeNotifier {
 
       if (_sessionStartTime != null) {
         final sessionId = _sessionStartTime!.millisecondsSinceEpoch.toString();
-        final durationMinutes = settings.focusMinutes;
+        final durationMinutes =
+            _customFocusSeconds != null ? _customFocusSeconds! ~/ 60 : settings.focusMinutes;
         final record = SessionRecord(
           id: sessionId,
           startTime: _sessionStartTime!,
@@ -218,6 +225,7 @@ class TimerController extends ChangeNotifier {
       _tag = '';
       _projectId = null;
       _taskRef = null;
+      _customFocusSeconds = null;
       onFocusComplete?.call();
 
       // Gate: show cycle-complete screen before the long break starts.
@@ -230,8 +238,12 @@ class TimerController extends ChangeNotifier {
         return;
       }
     } else {
+      final wasLongBreak = _phase == TimerPhase.longBreak;
       _phase = TimerPhase.focus;
       _sessionStartTime = null;
+      if (wasLongBreak) {
+        _currentSession = 1;
+      }
     }
 
     _secondsRemaining = totalSecondsForPhase;

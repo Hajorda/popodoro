@@ -119,7 +119,7 @@ class _Body extends StatelessWidget {
           const SizedBox(height: 10),
           ...peaks.map((p) {
             final h = p.hour;
-            final hLabel = h > 12 ? '${h - 12} ${h >= 12 ? 'pm' : 'am'}' : '$h ${h >= 12 ? 'pm' : 'am'}';
+            final hLabel = '${h == 0 ? 12 : h > 12 ? h - 12 : h} ${h >= 12 ? 'pm' : 'am'}';
             return Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Container(

@@ -246,9 +246,14 @@ class FocusGuardService extends ChangeNotifier {
 
   // ── Model loading ───────────────────────────────────────────────────────────
 
+  bool _loadingModel = false;
+
   Future<bool> _loadModel() async {
+    if (_loadingModel) return _interpreter != null;
+    _loadingModel = true;
     try {
       _interpreter?.close();
+      _interpreter = null;
       _interpreter = await Interpreter.fromAsset(
         'assets/models/yolo26n_float32.tflite',
         options: InterpreterOptions()..threads = 2,
@@ -289,6 +294,8 @@ class FocusGuardService extends ChangeNotifier {
     } catch (e) {
       debugPrint('[FocusGuard] model load error: $e');
       return false;
+    } finally {
+      _loadingModel = false;
     }
   }
 
@@ -421,13 +428,19 @@ class FocusGuardService extends ChangeNotifier {
       if (!kIsWeb && Platform.isMacOS) {
         detection = await _runCheckMacOS();
       } else {
-        if (_camera == null || !_cameraReady) return;
-        final file = await _camera!.takePicture();
+        final camera = _camera;
+        if (camera == null || !_cameraReady) return;
+        final file = await camera.takePicture();
+        if (_interpreter == null || _camera == null) {
+          try { await File(file.path).delete(); } catch (_) {}
+          return;
+        }
         final bytes = await File(file.path).readAsBytes();
-        await File(file.path).delete();
+        try { await File(file.path).delete(); } catch (_) {}
         detection = await _runInferenceFromBytes(bytes);
       }
 
+      if (_interpreter == null) return;
       await _handleDetection(detection);
     } catch (e) {
       debugPrint('[FocusGuard] check error: $e');
@@ -452,6 +465,8 @@ class FocusGuardService extends ChangeNotifier {
   }
 
   Future<_DetectionResult> _runInferenceFromBytes(Uint8List bytes) async {
+    final interpreter = _interpreter;
+    if (interpreter == null) return const _DetectionResult(true, false);
     try {
       final decoded = img.decodeImage(bytes);
       if (decoded == null) return const _DetectionResult(false, false);
@@ -473,10 +488,10 @@ class FocusGuardService extends ChangeNotifier {
 
       // Use .data= + .invoke() to preserve the 4D tensor shape from allocateTensors().
       // interpreter.run() reshapes the tensor to 1D which breaks the PAD op.
-      _interpreter!.getInputTensor(0).data = inputFloat.buffer.asUint8List();
-      _interpreter!.invoke();
+      interpreter.getInputTensor(0).data = inputFloat.buffer.asUint8List();
+      interpreter.invoke();
 
-      final outTensorData = _interpreter!.getOutputTensor(0).data;
+      final outTensorData = interpreter.getOutputTensor(0).data;
       final raw = outTensorData.buffer.asFloat32List();
       // Log first 12 floats (2 full anchors) to see if values vary between frames
       final preview = raw.take(12).map((v) => v.toStringAsFixed(2)).join(', ');
@@ -603,6 +618,7 @@ class FocusGuardService extends ChangeNotifier {
     _stopChecking();
     _disposeCamera();
     _interpreter?.close();
+    _interpreter = null;
     _settings.removeListener(_onSettingsChanged);
     _timer?.removeListener(_onTimerChanged);
     super.dispose();

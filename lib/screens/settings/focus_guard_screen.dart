@@ -303,6 +303,7 @@ class _EnableTileState extends State<_EnableTile> {
     if (enabling) {
       setState(() => _loading = true);
       final ok = await guard.initialize();
+      if (!mounted) return;
       setState(() => _loading = false);
       if (!ok && context.mounted) {
         _showCameraError(context, guard.lastCameraFailure);

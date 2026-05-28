@@ -309,6 +309,7 @@ class _AuthBodyState extends State<_AuthBody> {
   void _showForgotPassword(BuildContext context, AuthService auth) {
     final t = widget.t;
     final emailCtrl = TextEditingController(text: _email.text.trim());
+    final messenger = ScaffoldMessenger.of(context);
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -345,7 +346,7 @@ class _AuthBodyState extends State<_AuthBody> {
               if (ctx.mounted) {
                 Navigator.of(ctx).pop();
                 if (ok) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  messenger.showSnackBar(SnackBar(
                     content: Text('Reset link sent.',
                         style: TextStyle(fontFamily: AppFonts.ui)),
                     backgroundColor: t.ink,
@@ -361,7 +362,7 @@ class _AuthBodyState extends State<_AuthBody> {
           ),
         ],
       ),
-    );
+    ).whenComplete(emailCtrl.dispose);
   }
 }
 

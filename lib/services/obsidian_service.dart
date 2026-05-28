@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'bookmark_service.dart';
@@ -300,10 +301,8 @@ class ObsidianService extends ChangeNotifier {
   }
 
   bool _isHiddenPath(String filePath, String vaultRoot) {
-    final relative = filePath.substring(vaultRoot.length);
-    return relative.split(Platform.pathSeparator).any(
-          (segment) => segment.startsWith('.'),
-        );
+    final relative = p.relative(filePath, from: vaultRoot);
+    return p.split(relative).any((segment) => segment.startsWith('.'));
   }
 
   void _startWatcher() {
@@ -339,11 +338,25 @@ class ObsidianService extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Atomic write: write to .tmp then rename, preventing partial file writes.
+  // Atomic write: write to .tmp then swap into place. Windows rename can't
+  // replace existing files, so delete the original first; if rename still fails
+  // (e.g. the file is locked by Obsidian), fall back to copy+delete.
   Future<void> _writeAtomic(File file, List<String> lines) async {
     final tmp = File('${file.path}.tmp');
     await tmp.writeAsString(lines.join('\n'));
-    await tmp.rename(file.path);
+    if (Platform.isWindows && await file.exists()) {
+      try {
+        await file.delete();
+      } catch (_) {}
+    }
+    try {
+      await tmp.rename(file.path);
+    } on FileSystemException {
+      await tmp.copy(file.path);
+      try {
+        await tmp.delete();
+      } catch (_) {}
+    }
   }
 
   @override

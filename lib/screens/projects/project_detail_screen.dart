@@ -470,15 +470,40 @@ class _ObsidianTasksView extends StatelessWidget {
 
 // ── History tab ───────────────────────────────────────────────────────────────
 
-class _HistoryTab extends StatelessWidget {
+class _HistoryTab extends StatefulWidget {
   const _HistoryTab({required this.project, required this.t});
   final Project project;
   final AppTokens t;
 
   @override
+  State<_HistoryTab> createState() => _HistoryTabState();
+}
+
+class _HistoryTabState extends State<_HistoryTab> {
+  late Future<List<TaskPomodoro>> _historyFuture;
+  late AppTokens t = widget.t;
+
+  @override
+  void initState() {
+    super.initState();
+    _historyFuture =
+        context.read<ProjectService>().historyForProject(widget.project.id);
+  }
+
+  @override
+  void didUpdateWidget(_HistoryTab old) {
+    super.didUpdateWidget(old);
+    if (old.project.id != widget.project.id) {
+      _historyFuture =
+          context.read<ProjectService>().historyForProject(widget.project.id);
+    }
+    t = widget.t;
+  }
+
+  @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<TaskPomodoro>>(
-      future: context.read<ProjectService>().historyForProject(project.id),
+      future: _historyFuture,
       builder: (context, snap) {
         if (!snap.hasData) {
           return Center(child: CircularProgressIndicator(color: t.pop, strokeWidth: 2));
