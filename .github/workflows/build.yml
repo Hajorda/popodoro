@@ -38,6 +38,11 @@ jobs:
             c = File.read(f)
             c.gsub!(/CODE_SIGN_STYLE = Automatic;/, 'CODE_SIGN_STYLE = Manual;')
             c.gsub!(/DEVELOPMENT_TEAM = \S+;/, 'DEVELOPMENT_TEAM = \"\";')
+            # Strip explicit CODE_SIGN_IDENTITY lines (e.g. 'Apple Development').
+            # Without this, Manual signing + a named identity demands a provisioning
+            # profile, which we don't have on CI.
+            c.gsub!(/\"CODE_SIGN_IDENTITY\\[sdk=macosx\\*\\]\" = [^;]+;/, '\"CODE_SIGN_IDENTITY[sdk=macosx*]\" = \"-\";')
+            c.gsub!(/CODE_SIGN_IDENTITY = [^;]+;/, 'CODE_SIGN_IDENTITY = \"-\";')
             File.write(f, c)
           "
 
