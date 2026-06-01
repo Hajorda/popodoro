@@ -252,7 +252,9 @@ class TogetherService extends ChangeNotifier {
             .neq('status', 'complete')
             .maybeSingle();
 
-        if (roomData == null) throw Exception('Room not found or already ended');
+        if (roomData == null) {
+          throw Exception('No room with that code. Double-check the 6 letters.');
+        }
 
         _room = TogetherRoom.fromMap(roomData);
 
@@ -502,12 +504,26 @@ class TogetherService extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      _error = _isNetworkError(e)
+          ? "Can't reach the server. Check your connection and try again."
+          : e.toString().replaceFirst('Exception: ', '');
       _loading = false;
       debugPrint('[TogetherService] error: $e');
       notifyListeners();
       return false;
     }
+  }
+
+  /// True for connectivity/transport failures (offline, DNS, timeout, dropped
+  /// connection) — as opposed to our own user-facing `Exception(...)` messages.
+  static bool _isNetworkError(Object e) {
+    if (e is TimeoutException) return true;
+    final text = e.toString().toLowerCase();
+    return text.contains('socketexception') ||
+        text.contains('failed host lookup') ||
+        text.contains('clientexception') ||
+        text.contains('connection') ||
+        text.contains('timed out');
   }
 
   static String _generateCode() {
