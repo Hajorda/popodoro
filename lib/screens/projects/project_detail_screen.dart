@@ -246,10 +246,12 @@ class _NativeTasksViewState extends State<_NativeTasksView> {
           _AddTaskField(
             controller: _ctrl,
             t: t,
-            onSubmit: () async {
+            onSubmit: (estimate) async {
               final title = _ctrl.text.trim();
               if (title.isNotEmpty) {
-                await context.read<ProjectController>().addTask(title: title);
+                await context
+                    .read<ProjectController>()
+                    .addTask(title: title, expectedPomodoros: estimate);
               }
               _ctrl.clear();
               setState(() => _adding = false);
@@ -366,22 +368,34 @@ class _PomodoroProgress extends StatelessWidget {
   }
 }
 
-class _AddTaskField extends StatelessWidget {
+class _AddTaskField extends StatefulWidget {
   const _AddTaskField({required this.controller, required this.t, required this.onSubmit, required this.onCancel});
   final TextEditingController controller;
   final AppTokens t;
-  final VoidCallback onSubmit;
+  final ValueChanged<int> onSubmit;
   final VoidCallback onCancel;
 
   @override
+  State<_AddTaskField> createState() => _AddTaskFieldState();
+}
+
+class _AddTaskFieldState extends State<_AddTaskField> {
+  int _estimate = 0;
+
+  void _bump(int delta) {
+    setState(() => _estimate = (_estimate + delta).clamp(0, 20));
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final t = widget.t;
     return Row(
       children: [
         Expanded(
           child: TextField(
-            controller: controller,
+            controller: widget.controller,
             autofocus: true,
-            onSubmitted: (_) => onSubmit(),
+            onSubmitted: (_) => widget.onSubmit(_estimate),
             style: TextStyle(fontFamily: AppFonts.ui, fontSize: 14, color: t.ink),
             decoration: InputDecoration(
               hintText: 'Task name',
@@ -390,10 +404,61 @@ class _AddTaskField extends StatelessWidget {
             ),
           ),
         ),
-        GestureDetector(onTap: onSubmit, child: Icon(Icons.check_rounded, size: 18, color: t.sage)),
+        _EstimateStepper(estimate: _estimate, t: t, onBump: _bump),
+        const SizedBox(width: 10),
+        GestureDetector(onTap: () => widget.onSubmit(_estimate), child: Icon(Icons.check_rounded, size: 18, color: t.sage)),
         const SizedBox(width: 8),
-        GestureDetector(onTap: onCancel, child: Icon(Icons.close_rounded, size: 18, color: t.ink3)),
+        GestureDetector(onTap: widget.onCancel, child: Icon(Icons.close_rounded, size: 18, color: t.ink3)),
       ],
+    );
+  }
+}
+
+class _EstimateStepper extends StatelessWidget {
+  const _EstimateStepper({required this.estimate, required this.t, required this.onBump});
+  final int estimate;
+  final AppTokens t;
+  final ValueChanged<int> onBump;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = estimate == 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: t.surface2,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.local_florist_rounded, size: 12, color: muted ? t.ink3 : t.ember),
+          GestureDetector(
+            onTap: () => onBump(-1),
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Icon(Icons.remove_rounded, size: 14, color: t.ink3),
+            ),
+          ),
+          SizedBox(
+            width: 14,
+            child: Text(
+              '$estimate',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontFamily: AppFonts.mono, fontSize: 12, color: muted ? t.ink3 : t.ink),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => onBump(1),
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Icon(Icons.add_rounded, size: 14, color: t.ink3),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -433,15 +498,22 @@ class _ObsidianTasksView extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Row(
                   children: [
-                    Container(
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: t.border, width: 1.5),
+                    GestureDetector(
+                      onTap: () => context.read<ObsidianService>().markTaskComplete(task),
+                      behavior: HitTestBehavior.opaque,
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: t.border, width: 1.5),
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
