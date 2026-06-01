@@ -435,7 +435,11 @@ class _BreakBody extends StatelessWidget {
   void _confirmLeave(BuildContext context, TogetherService together) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => _LeaveDialog(t: t),
+      builder: (_) => _LeaveDialog(
+        t: t,
+        isHost: together.isHost,
+        isOnlyParticipant: together.participants.length <= 1,
+      ),
     );
     if (ok == true && context.mounted) {
       await together.leaveRoom();
@@ -515,7 +519,11 @@ class _TopBar extends StatelessWidget {
                 onTap: () async {
                   final ok = await showDialog<bool>(
                     context: context,
-                    builder: (_) => _LeaveDialog(t: t),
+                    builder: (_) => _LeaveDialog(
+                      t: t,
+                      isHost: together.isHost,
+                      isOnlyParticipant: together.participants.length <= 1,
+                    ),
                   );
                   if (ok == true && context.mounted) {
                     await context.read<TogetherService>().leaveRoom();
@@ -1018,8 +1026,26 @@ class _GhostBtn extends StatelessWidget {
 // ── Leave confirmation dialog ─────────────────────────────────────────────────
 
 class _LeaveDialog extends StatelessWidget {
-  const _LeaveDialog({required this.t});
+  const _LeaveDialog({
+    required this.t,
+    this.isHost = false,
+    this.isOnlyParticipant = false,
+  });
   final AppTokens t;
+  final bool isHost;
+  final bool isOnlyParticipant;
+
+  String get _body {
+    if (isOnlyParticipant) {
+      // No one else here — leaving ends the session.
+      return 'You\'re the only one here, so leaving ends the session.';
+    }
+    if (isHost) {
+      // Handoff now keeps the room alive after the host departs.
+      return 'We\'ll pass the timer to someone else so your friends can keep going.';
+    }
+    return 'You\'ll exit the room. Your friends will keep going.';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1030,7 +1056,7 @@ class _LeaveDialog extends StatelessWidget {
           style: TextStyle(
               fontFamily: AppFonts.ui, fontSize: 16, color: t.ink)),
       content: Text(
-        'You\'ll exit the room. Your friends will keep going.',
+        _body,
         style:
             TextStyle(fontFamily: AppFonts.ui, fontSize: 13, color: t.ink2),
       ),
