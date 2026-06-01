@@ -180,6 +180,7 @@ class TogetherService extends ChangeNotifier {
   TogetherRoom? _room;
   List<TogetherParticipant> _participants = [];
   List<TogetherReaction> _recentReactions = [];
+  final Set<String> _onlineIds = {};
   RealtimeChannel? _channel;
   Timer? _ticker;
   StreamSubscription<AuthState>? _authSub;
@@ -207,9 +208,21 @@ class TogetherService extends ChangeNotifier {
   TogetherParticipant? get myParticipant =>
       _participants.where((p) => p.userId == myUserId).firstOrNull;
 
+  /// User IDs that are currently connected via Realtime presence.
+  Set<String> get onlineUserIds => _onlineIds;
+
+  bool isOnline(String userId) => _onlineIds.contains(userId);
+
+  /// Participants who are actually online right now. Until presence has synced
+  /// (`_onlineIds` empty) we fall back to all DB participants so nobody is
+  /// hidden during the brief window before the first presence sync.
+  List<TogetherParticipant> get onlineParticipants => _participants
+      .where((p) => _onlineIds.isEmpty || _onlineIds.contains(p.userId))
+      .toList();
+
   bool get allReady =>
-      _participants.isNotEmpty &&
-      _participants.every((p) => p.isReady || p.isFocusing || p.isDone);
+      onlineParticipants.isNotEmpty &&
+      onlineParticipants.every((p) => p.isReady || p.isFocusing || p.isDone);
 
   // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -252,7 +265,9 @@ class TogetherService extends ChangeNotifier {
             .neq('status', 'complete')
             .maybeSingle();
 
-        if (roomData == null) throw Exception('Room not found or already ended');
+        if (roomData == null) {
+          throw Exception('No room with that code. Double-check the 6 letters.');
+        }
 
         _room = TogetherRoom.fromMap(roomData);
 
@@ -381,6 +396,21 @@ class TogetherService extends ChangeNotifier {
   Future<void> leaveRoom() async {
     _ticker?.cancel();
     _ticker = null;
+    // If I'm the host and someone else is still here, hand the room off before
+    // I tear down — otherwise guests would freeze with no one to drive the
+    // timer. Do this BEFORE unsubscribing so presence is still accurate.
+    if (_room != null && isHost) {
+      final successorId = _pickSuccessor();
+      if (successorId != null) {
+        try {
+          await _client
+              .from('rooms')
+              .update({'host_id': successorId}).eq('id', _room!.id);
+        } catch (e) {
+          debugPrint('[TogetherService] host handoff on leave failed: $e');
+        }
+      }
+    }
     await _unsubscribe();
     if (_room != null && myUserId != null) {
       try {
@@ -443,7 +473,79 @@ class TogetherService extends ChangeNotifier {
               value: roomId),
           callback: _onReaction,
         )
-        .subscribe();
+        .onPresenceSync((_) => _syncPresence())
+        .onPresenceJoin((_) => _syncPresence())
+        .onPresenceLeave((_) => _syncPresence())
+        .subscribe((status, [error]) {
+      if (status == RealtimeSubscribeStatus.subscribed) {
+        final uid = myUserId;
+        final channel = _channel;
+        if (uid != null && channel != null) {
+          unawaited(channel.track({'user_id': uid}));
+        }
+      }
+    });
+  }
+
+  /// Rebuilds [_onlineIds] from the channel's current presence state. Each
+  /// tracked client shares a `{'user_id': ...}` payload, so we collect those.
+  void _syncPresence() {
+    final channel = _channel;
+    if (channel == null) return;
+    _onlineIds
+      ..clear()
+      ..addAll(channel
+          .presenceState()
+          .expand((state) => state.presences)
+          .map((presence) => presence.payload['user_id'])
+          .whereType<String>());
+    notifyListeners();
+    // Presence just changed — the host may have dropped. Try to recover.
+    unawaited(_maybeClaimHost());
+  }
+
+  /// Picks the deterministic successor host among the OTHER participants:
+  /// the smallest `userId`, preferring those currently online. Returns null
+  /// when I'm the only participant (nobody to hand off to).
+  String? _pickSuccessor() {
+    final others = _participants.where((p) => p.userId != myUserId).toList();
+    if (others.isEmpty) return null;
+    final online = others.where((p) => isOnline(p.userId)).toList();
+    final pool = online.isNotEmpty ? online : others;
+    return pool
+        .map((p) => p.userId)
+        .reduce((a, b) => a.compareTo(b) <= 0 ? a : b);
+  }
+
+  /// Crash/disconnect recovery: when presence shows the current host is gone
+  /// mid-session, the lowest-userId online participant promotes itself so the
+  /// timer keeps advancing. Realtime echoes the new host_id to everyone via
+  /// [_onRoomChange]. Deterministic election keeps every client from racing.
+  Future<void> _maybeClaimHost() async {
+    final room = _room;
+    if (room == null) return;
+    // Only worth recovering an in-progress session.
+    if (!(room.isFocusing || room.isPaused || room.isOnBreak)) return;
+    // Nothing to do if I'm already the host.
+    if (isHost) return;
+    // Host still here? leave it alone.
+    if (_onlineIds.contains(room.hostId)) return;
+
+    // Elect the smallest userId among CURRENTLY ONLINE participants.
+    final candidates = onlineParticipants.map((p) => p.userId).toList();
+    if (candidates.isEmpty) return;
+    final successor =
+        candidates.reduce((a, b) => a.compareTo(b) <= 0 ? a : b);
+    if (successor != myUserId) return;
+
+    try {
+      await _client
+          .from('rooms')
+          .update({'host_id': myUserId!}).eq('id', room.id);
+      debugPrint('[TogetherService] claimed host after host left: $myUserId');
+    } catch (e) {
+      debugPrint('[TogetherService] claim host failed: $e');
+    }
   }
 
   void _onRoomChange(PostgresChangePayload payload) {
@@ -481,6 +583,7 @@ class TogetherService extends ChangeNotifier {
   }
 
   Future<void> _unsubscribe() async {
+    _onlineIds.clear();
     final ch = _channel;
     if (ch != null) {
       _channel = null;
@@ -502,12 +605,26 @@ class TogetherService extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      _error = _isNetworkError(e)
+          ? "Can't reach the server. Check your connection and try again."
+          : e.toString().replaceFirst('Exception: ', '');
       _loading = false;
       debugPrint('[TogetherService] error: $e');
       notifyListeners();
       return false;
     }
+  }
+
+  /// True for connectivity/transport failures (offline, DNS, timeout, dropped
+  /// connection) — as opposed to our own user-facing `Exception(...)` messages.
+  static bool _isNetworkError(Object e) {
+    if (e is TimeoutException) return true;
+    final text = e.toString().toLowerCase();
+    return text.contains('socketexception') ||
+        text.contains('failed host lookup') ||
+        text.contains('clientexception') ||
+        text.contains('connection') ||
+        text.contains('timed out');
   }
 
   static String _generateCode() {

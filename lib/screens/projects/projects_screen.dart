@@ -61,17 +61,25 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(builder: (_) => const CreateProjectScreen()),
           ),
+          behavior: HitTestBehavior.opaque,
           child: Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: t.surface,
-                border: Border.all(color: t.border),
+            // Hit area expanded to >=48px for accessibility; the visible 32×32
+            // circle stays centered and unchanged.
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              child: Center(
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: t.surface,
+                    border: Border.all(color: t.border),
+                  ),
+                  child: Icon(Icons.add_rounded, size: 16, color: t.ink),
+                ),
               ),
-              child: Icon(Icons.add_rounded, size: 16, color: t.ink),
             ),
           ),
         ),
@@ -97,14 +105,120 @@ class _Body extends StatelessWidget {
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-      children: ctrl.projects
-          .map((p) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _ProjectCard(project: p, t: t),
-              ))
-          .toList(),
+      children: [
+        ...ctrl.projects.map((p) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _ProjectCard(project: p, t: t),
+            )),
+        _ArchivedButton(t: t, ctrl: ctrl),
+      ],
     );
   }
+}
+
+class _ArchivedButton extends StatelessWidget {
+  const _ArchivedButton({required this.t, required this.ctrl});
+  final AppTokens t;
+  final ProjectController ctrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Project>>(
+      future: ctrl.fetchArchivedProjects(),
+      builder: (context, snap) {
+        final archived = snap.data ?? const <Project>[];
+        if (archived.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: GestureDetector(
+            onTap: () => _showArchivedSheet(context, t, ctrl),
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.archive_outlined, size: 14, color: t.ink3),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Archived (${archived.length})',
+                    style: TextStyle(fontFamily: AppFonts.ui, fontSize: 13, color: t.ink3),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+void _showArchivedSheet(BuildContext context, AppTokens t, ProjectController ctrl) {
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: t.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (sheetCtx) => StatefulBuilder(
+      builder: (sheetCtx, setSheetState) => FutureBuilder<List<Project>>(
+        future: ctrl.fetchArchivedProjects(),
+        builder: (context, snap) {
+          final archived = snap.data ?? const <Project>[];
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Archived projects',
+                    style: TextStyle(fontFamily: AppFonts.ui, fontSize: 15, fontWeight: FontWeight.w600, color: t.ink),
+                  ),
+                  const SizedBox(height: 12),
+                  if (archived.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Text(
+                        'No archived projects',
+                        style: TextStyle(fontFamily: AppFonts.ui, fontSize: 13, color: t.ink3),
+                      ),
+                    )
+                  else
+                    ...archived.map((p) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  p.name,
+                                  style: TextStyle(fontFamily: AppFonts.ui, fontSize: 14, color: t.ink),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              GestureDetector(
+                                onTap: () async {
+                                  await ctrl.unarchiveProject(p.id);
+                                  setSheetState(() {});
+                                },
+                                child: Text(
+                                  'Restore',
+                                  style: TextStyle(fontFamily: AppFonts.ui, fontSize: 13, fontWeight: FontWeight.w600, color: t.pop),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    ),
+  );
 }
 
 class _EmptyState extends StatelessWidget {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../controllers/history_controller.dart';
+import '../../controllers/settings_controller.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/theme/app_typography.dart';
 import '../../widgets/mascot/pop_mascot.dart';
@@ -170,39 +171,30 @@ class _Body extends StatelessWidget {
   }
 }
 
-// ── Toggles (stateful, no controller backing yet) ─────────────────────────────
+// ── Toggles (backed by SettingsController, persisted to prefs) ────────────────
 
-class _TogglesCard extends StatefulWidget {
+class _TogglesCard extends StatelessWidget {
   const _TogglesCard({required this.t});
   final AppTokens t;
-  @override
-  State<_TogglesCard> createState() => _TogglesCardState();
-}
-
-class _TogglesCardState extends State<_TogglesCard> {
-  bool _goldenHour = true;
-  bool _streakCheckin = true;
-  bool _sessionPat = true;
-  bool _buddyFocus = false;
 
   @override
   Widget build(BuildContext context) {
-    final t = widget.t;
+    final s = context.watch<SettingsController>();
     return Container(
       decoration: BoxDecoration(color: t.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: t.border)),
       child: Column(
         children: [
           _ToggleRow(t: t, label: 'Golden-hour nudges', sub: 'Gentle hello at the start of your best windows',
-              value: _goldenHour, onChanged: (v) => setState(() => _goldenHour = v)),
+              value: s.nudgeGoldenHour, onChanged: (v) => s.nudgeGoldenHour = v),
           Divider(color: t.border, height: 1, indent: 16),
           _ToggleRow(t: t, label: 'Streak check-in', sub: "Only if you haven't focused by 4pm",
-              value: _streakCheckin, onChanged: (v) => setState(() => _streakCheckin = v)),
+              value: s.nudgeStreakCheckin, onChanged: (v) => s.nudgeStreakCheckin = v),
           Divider(color: t.border, height: 1, indent: 16),
           _ToggleRow(t: t, label: 'End-of-session pat', sub: 'Quiet celebration after each session',
-              value: _sessionPat, onChanged: (v) => setState(() => _sessionPat = v)),
+              value: s.nudgeSessionPat, onChanged: (v) => s.nudgeSessionPat = v),
           Divider(color: t.border, height: 1, indent: 16),
           _ToggleRow(t: t, label: 'Buddy is focusing', sub: 'When a buddy starts a session',
-              value: _buddyFocus, onChanged: (v) => setState(() => _buddyFocus = v), isLast: true),
+              value: s.nudgeBuddyFocus, onChanged: (v) => s.nudgeBuddyFocus = v, isLast: true),
         ],
       ),
     );

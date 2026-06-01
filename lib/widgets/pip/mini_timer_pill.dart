@@ -67,6 +67,7 @@ class MiniTimerPill extends StatelessWidget {
                 _PillIconButton(
                   icon: Icons.open_in_full_rounded,
                   color: t.ink2,
+                  label: 'Expand',
                   onTap: () => windowService.exitMiniMode(),
                 ),
               ],
@@ -126,6 +127,7 @@ class MiniTimerPill extends StatelessWidget {
                 _PillIconButton(
                   icon: Icons.open_in_full_rounded,
                   color: t.ink3,
+                  label: 'Expand',
                   onTap: () => windowService.exitMiniMode(),
                 ),
               ],
@@ -138,6 +140,7 @@ class MiniTimerPill extends StatelessWidget {
     // Solo timer pill.
     final timer = context.watch<TimerController>();
     final isRunning = timer.status == TimerStatus.running;
+    final isPaused = timer.status == TimerStatus.paused;
 
     return GestureDetector(
       onPanStart: (_) => _startDragging(),
@@ -159,7 +162,7 @@ class MiniTimerPill extends StatelessWidget {
                   fontFamily: AppFonts.mono,
                   fontSize: 26,
                   fontWeight: FontWeight.w700,
-                  color: t.ink,
+                  color: isPaused ? t.ink3 : t.ink,
                   letterSpacing: -1,
                   height: 1.0,
                 ),
@@ -167,12 +170,13 @@ class MiniTimerPill extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  timer.phase.labelUpper,
+                  isPaused ? 'PAUSED' : timer.phase.labelUpper,
                   style: TextStyle(
                     fontFamily: AppFonts.mono,
                     fontSize: 9,
-                    letterSpacing: 0.12,
-                    color: t.ink3,
+                    letterSpacing: isPaused ? 0.24 : 0.12,
+                    fontWeight: isPaused ? FontWeight.w700 : FontWeight.w400,
+                    color: isPaused ? t.ink2 : t.ink3,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -180,6 +184,7 @@ class MiniTimerPill extends StatelessWidget {
               _PillIconButton(
                 icon: isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
                 color: t.ink2,
+                label: isRunning ? 'Pause' : 'Resume',
                 onTap: () {
                   if (isRunning) {
                     timer.pause();
@@ -192,6 +197,7 @@ class MiniTimerPill extends StatelessWidget {
               _PillIconButton(
                 icon: Icons.open_in_full_rounded,
                 color: t.ink3,
+                label: 'Expand',
                 onTap: () => windowService.exitMiniMode(),
               ),
             ],
@@ -232,21 +238,34 @@ class _PillIconButton extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.onTap,
+    this.label,
   });
 
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
+  final String? label;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 30,
-        height: 30,
-        child: Icon(icon, size: 16, color: color),
+    return Semantics(
+      button: true,
+      label: label,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        // Hit area expanded to >=48px for accessibility; the visible 30×30
+        // icon box (16px glyph) stays centered and unchanged.
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          child: Center(
+            child: SizedBox(
+              width: 30,
+              height: 30,
+              child: Icon(icon, size: 16, color: color),
+            ),
+          ),
+        ),
       ),
     );
   }

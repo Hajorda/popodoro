@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../controllers/history_controller.dart';
 import '../../controllers/timer_controller.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/theme/app_typography.dart';
@@ -38,7 +39,12 @@ class _CompleteContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Column(
+        LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: IntrinsicHeight(
+                child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 24),
@@ -100,10 +106,10 @@ class _CompleteContent extends StatelessWidget {
           ),
         ),
         const Spacer(flex: 2),
-        // Mock stats card
+        // Stats card
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 28),
-          child: _StatsCard(t: t, sessionCount: _count),
+          child: _StatsCard(t: t),
         ),
         const Spacer(flex: 3),
         // CTAs
@@ -112,18 +118,6 @@ class _CompleteContent extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              PopButton(
-                label: '↑ Share',
-                variant: PopButtonVariant.secondary,
-                small: true,
-                onPressed: () => _onShare(context),
-                inkColor: t.ink,
-                bgColor: t.bg,
-                surfaceColor: t.surface,
-                borderColor: t.border,
-                ink2Color: t.ink2,
-              ),
-              const SizedBox(width: 12),
               PopButton(
                 label: 'Take your break →',
                 variant: PopButtonVariant.primary,
@@ -141,6 +135,10 @@ class _CompleteContent extends StatelessWidget {
         ),
         const SizedBox(height: 32),
       ],
+                ),
+              ),
+            ),
+          ),
         ),
         if (WindowService.isDesktop)
           Positioned(
@@ -163,35 +161,22 @@ class _CompleteContent extends StatelessWidget {
       ],
     );
   }
-
-  void _onShare(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Shareable recap coming soon!',
-          style: TextStyle(fontFamily: AppFonts.ui, fontSize: 13),
-        ),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: t.ink,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
 }
 
 class _StatsCard extends StatelessWidget {
-  const _StatsCard({required this.t, required this.sessionCount});
+  const _StatsCard({required this.t});
 
   final AppTokens t;
-  final int sessionCount;
 
   @override
   Widget build(BuildContext context) {
-    // Mock values — will be replaced with real tracking in a future phase.
-    final focusMinutes = sessionCount * 25;
+    final history = context.watch<HistoryController>();
+    final focusMinutes = history.totalFocusedMinutesToday;
     final hours = focusMinutes ~/ 60;
     final mins = focusMinutes % 60;
     final focusLabel = hours > 0 ? '${hours}h ${mins}m' : '${mins}m';
+    final sessions = history.todaySessions.length;
+    final streakDays = history.streakDays;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -205,9 +190,13 @@ class _StatsCard extends StatelessWidget {
         children: [
           _Stat(label: 'Focus time', value: focusLabel, t: t),
           _Divider(t: t),
-          _Stat(label: 'Sessions', value: '$sessionCount', t: t),
+          _Stat(label: 'Sessions', value: '$sessions', t: t),
           _Divider(t: t),
-          _Stat(label: 'Streak', value: '3 days', t: t),
+          _Stat(
+            label: 'Streak',
+            value: '$streakDays ${streakDays == 1 ? "day" : "days"}',
+            t: t,
+          ),
         ],
       ),
     );

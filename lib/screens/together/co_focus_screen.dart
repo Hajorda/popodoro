@@ -435,7 +435,11 @@ class _BreakBody extends StatelessWidget {
   void _confirmLeave(BuildContext context, TogetherService together) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => _LeaveDialog(t: t),
+      builder: (_) => _LeaveDialog(
+        t: t,
+        isHost: together.isHost,
+        isOnlyParticipant: together.participants.length <= 1,
+      ),
     );
     if (ok == true && context.mounted) {
       await together.leaveRoom();
@@ -515,7 +519,11 @@ class _TopBar extends StatelessWidget {
                 onTap: () async {
                   final ok = await showDialog<bool>(
                     context: context,
-                    builder: (_) => _LeaveDialog(t: t),
+                    builder: (_) => _LeaveDialog(
+                      t: t,
+                      isHost: together.isHost,
+                      isOnlyParticipant: together.participants.length <= 1,
+                    ),
                   );
                   if (ok == true && context.mounted) {
                     await context.read<TogetherService>().leaveRoom();
@@ -780,17 +788,32 @@ class _ReactionTray extends StatefulWidget {
 
 class _ReactionTrayState extends State<_ReactionTray> {
   static const _emojis = ['🔥', '💪', '⚡', '🎉', '❤️'];
-  String? _sent;
+
+  // The emoji currently showing its tap pulse. Cleared after a short flash so
+  // the highlight is purely cosmetic — it never gates the rest of the tray.
+  String? _flash;
+  // Very short per-tap debounce to swallow accidental double-fires only. The
+  // tray as a whole stays live, so reactions can be sent back-to-back.
+  DateTime? _lastTap;
 
   Future<void> _send(String emoji) async {
-    setState(() => _sent = emoji);
+    final now = DateTime.now();
+    if (_lastTap != null &&
+        now.difference(_lastTap!) < const Duration(milliseconds: 300)) {
+      return;
+    }
+    _lastTap = now;
+
+    setState(() => _flash = emoji);
     for (final p in widget.together.participants) {
       if (p.userId != widget.together.myUserId) {
         await widget.together.sendReaction(emoji, p.userId);
       }
     }
-    await Future<void>.delayed(const Duration(milliseconds: 1500));
-    if (mounted) setState(() => _sent = null);
+    // Clear the per-tap pulse shortly after; this does not lock the tray.
+    Future<void>.delayed(const Duration(milliseconds: 280), () {
+      if (mounted && _flash == emoji) setState(() => _flash = null);
+    });
   }
 
   @override
@@ -829,9 +852,9 @@ class _ReactionTrayState extends State<_ReactionTray> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: _emojis.map((e) {
-              final active = _sent == e;
+              final active = _flash == e;
               return GestureDetector(
-                onTap: _sent == null ? () => _send(e) : null,
+                onTap: () => _send(e),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 120),
                   margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -1003,8 +1026,26 @@ class _GhostBtn extends StatelessWidget {
 // ── Leave confirmation dialog ─────────────────────────────────────────────────
 
 class _LeaveDialog extends StatelessWidget {
-  const _LeaveDialog({required this.t});
+  const _LeaveDialog({
+    required this.t,
+    this.isHost = false,
+    this.isOnlyParticipant = false,
+  });
   final AppTokens t;
+  final bool isHost;
+  final bool isOnlyParticipant;
+
+  String get _body {
+    if (isOnlyParticipant) {
+      // No one else here — leaving ends the session.
+      return 'You\'re the only one here, so leaving ends the session.';
+    }
+    if (isHost) {
+      // Handoff now keeps the room alive after the host departs.
+      return 'We\'ll pass the timer to someone else so your friends can keep going.';
+    }
+    return 'You\'ll exit the room. Your friends will keep going.';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1015,7 +1056,7 @@ class _LeaveDialog extends StatelessWidget {
           style: TextStyle(
               fontFamily: AppFonts.ui, fontSize: 16, color: t.ink)),
       content: Text(
-        'You\'ll exit the room. Your friends will keep going.',
+        _body,
         style:
             TextStyle(fontFamily: AppFonts.ui, fontSize: 13, color: t.ink2),
       ),

@@ -105,20 +105,21 @@ class _Body extends StatelessWidget {
           ),
         ),
 
-        // Status indicator when active
-        if (settings.focusGuardEnabled) ...[
-          const SizedBox(height: 24),
-          _SectionLabel(t: t, label: 'WHAT IT DETECTS'),
-          const SizedBox(height: 10),
-          _DetectList(t: t),
-          const SizedBox(height: 24),
-          _SectionLabel(t: t, label: 'HOW IT WORKS'),
-          const SizedBox(height: 10),
-          _HowItWorksCard(t: t),
-          if (!guard.isModelLoaded) ...[
-            const SizedBox(height: 20),
-            _ModelNotReadyBanner(t: t, guard: guard),
-          ],
+        // What it detects / how it works — shown unconditionally so users can
+        // read the privacy & operation explanation before granting camera access.
+        const SizedBox(height: 24),
+        _SectionLabel(t: t, label: 'WHAT IT DETECTS'),
+        const SizedBox(height: 10),
+        _DetectList(t: t),
+        const SizedBox(height: 24),
+        _SectionLabel(t: t, label: 'HOW IT WORKS'),
+        const SizedBox(height: 10),
+        _HowItWorksCard(t: t),
+
+        // Live status — only relevant once the feature is enabled.
+        if (settings.focusGuardEnabled && !guard.isModelLoaded) ...[
+          const SizedBox(height: 20),
+          _ModelNotReadyBanner(t: t, guard: guard),
         ],
       ],
     );

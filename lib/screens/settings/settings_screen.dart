@@ -155,7 +155,7 @@ class _SettingsBody extends StatelessWidget {
               label: 'Sounds',
               value: settings.soundEnabled ? 'on' : 'off',
               isLast: false,
-              onTap: () {},
+              onTap: () => settings.soundEnabled = !settings.soundEnabled,
             ),
             _Separator(t: t),
             _NavRow(

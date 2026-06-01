@@ -40,6 +40,10 @@ class SettingsController extends ChangeNotifier {
     required bool showNudgeCard,
     required bool showProjectRow,
     required bool showSessionInfo,
+    required bool nudgeGoldenHour,
+    required bool nudgeStreakCheckin,
+    required bool nudgeSessionPat,
+    required bool nudgeBuddyFocus,
   }) : _prefs = prefs,
        _focusMinutes = focusMinutes,
        _shortBreakMinutes = shortBreakMinutes,
@@ -57,7 +61,11 @@ class SettingsController extends ChangeNotifier {
        _showGreeting = showGreeting,
        _showNudgeCard = showNudgeCard,
        _showProjectRow = showProjectRow,
-       _showSessionInfo = showSessionInfo;
+       _showSessionInfo = showSessionInfo,
+       _nudgeGoldenHour = nudgeGoldenHour,
+       _nudgeStreakCheckin = nudgeStreakCheckin,
+       _nudgeSessionPat = nudgeSessionPat,
+       _nudgeBuddyFocus = nudgeBuddyFocus;
 
   // Load from disk. Call once before runApp.
   static Future<SettingsController> load() async {
@@ -83,6 +91,10 @@ class SettingsController extends ChangeNotifier {
       showNudgeCard: prefs.getBool(_kShowNudgeCard) ?? true,
       showProjectRow: prefs.getBool(_kShowProjectRow) ?? true,
       showSessionInfo: prefs.getBool(_kShowSessionInfo) ?? true,
+      nudgeGoldenHour: prefs.getBool(_kNudgeGoldenHour) ?? true,
+      nudgeStreakCheckin: prefs.getBool(_kNudgeStreakCheckin) ?? true,
+      nudgeSessionPat: prefs.getBool(_kNudgeSessionPat) ?? true,
+      nudgeBuddyFocus: prefs.getBool(_kNudgeBuddyFocus) ?? false,
     );
   }
 
@@ -104,6 +116,10 @@ class SettingsController extends ChangeNotifier {
   static const _kShowNudgeCard = 'showNudgeCard';
   static const _kShowProjectRow = 'showProjectRow';
   static const _kShowSessionInfo = 'showSessionInfo';
+  static const _kNudgeGoldenHour = 'nudgeGoldenHour';
+  static const _kNudgeStreakCheckin = 'nudgeStreakCheckin';
+  static const _kNudgeSessionPat = 'nudgeSessionPat';
+  static const _kNudgeBuddyFocus = 'nudgeBuddyFocus';
 
   final SharedPreferences _prefs;
 
@@ -125,6 +141,10 @@ class SettingsController extends ChangeNotifier {
   bool _showNudgeCard;
   bool _showProjectRow;
   bool _showSessionInfo;
+  bool _nudgeGoldenHour;
+  bool _nudgeStreakCheckin;
+  bool _nudgeSessionPat;
+  bool _nudgeBuddyFocus;
 
   // ── Getters ──────────────────────────────────────────────────────────────────
   SharedPreferences get prefs => _prefs;
@@ -145,6 +165,10 @@ class SettingsController extends ChangeNotifier {
   bool get showNudgeCard => _showNudgeCard;
   bool get showProjectRow => _showProjectRow;
   bool get showSessionInfo => _showSessionInfo;
+  bool get nudgeGoldenHour => _nudgeGoldenHour;
+  bool get nudgeStreakCheckin => _nudgeStreakCheckin;
+  bool get nudgeSessionPat => _nudgeSessionPat;
+  bool get nudgeBuddyFocus => _nudgeBuddyFocus;
 
   // Valid option sets used by the UI
   static const focusOptions = [15, 25, 50, 90];
@@ -269,6 +293,34 @@ class SettingsController extends ChangeNotifier {
     if (_showSessionInfo == v) return;
     _showSessionInfo = v;
     _prefs.setBool(_kShowSessionInfo, v);
+    notifyListeners();
+  }
+
+  set nudgeGoldenHour(bool v) {
+    if (_nudgeGoldenHour == v) return;
+    _nudgeGoldenHour = v;
+    _prefs.setBool(_kNudgeGoldenHour, v);
+    notifyListeners();
+  }
+
+  set nudgeStreakCheckin(bool v) {
+    if (_nudgeStreakCheckin == v) return;
+    _nudgeStreakCheckin = v;
+    _prefs.setBool(_kNudgeStreakCheckin, v);
+    notifyListeners();
+  }
+
+  set nudgeSessionPat(bool v) {
+    if (_nudgeSessionPat == v) return;
+    _nudgeSessionPat = v;
+    _prefs.setBool(_kNudgeSessionPat, v);
+    notifyListeners();
+  }
+
+  set nudgeBuddyFocus(bool v) {
+    if (_nudgeBuddyFocus == v) return;
+    _nudgeBuddyFocus = v;
+    _prefs.setBool(_kNudgeBuddyFocus, v);
     notifyListeners();
   }
 }

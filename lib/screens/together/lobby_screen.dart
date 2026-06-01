@@ -72,6 +72,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
             .toList();
         final me = together.myParticipant;
         final allReady = together.allReady;
+        final totalCount = together.participants.length;
+        final readyCount = together.participants
+            .where((p) => p.isReady || p.isFocusing || p.isDone)
+            .length;
 
         return Scaffold(
           backgroundColor: t.bg,
@@ -193,11 +197,12 @@ class _LobbyScreenState extends State<LobbyScreen> {
                         child: together.isHost
                             ? _PrimaryBtn(
                                 t: t,
-                                label: allReady
-                                    ? 'Start!'
-                                    : 'Waiting…',
-                                enabled: allReady ||
-                                    together.participants.isNotEmpty,
+                                label: totalCount <= 1
+                                    ? 'Start solo'
+                                    : !allReady
+                                        ? 'Start ($readyCount/$totalCount ready)'
+                                        : 'Start!',
+                                enabled: true,
                                 loading: together.loading,
                                 onTap: together.startRoom,
                               )

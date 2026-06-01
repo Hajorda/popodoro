@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../controllers/timer_controller.dart';
@@ -112,45 +113,64 @@ class _PopodoroShellState extends State<PopodoroShell> {
   Widget build(BuildContext context) {
     final windowService = context.watch<WindowService>();
 
+    final Widget body;
     // Mini mode short-circuits all other routing — always show the pill.
     if (windowService.isMiniMode) {
-      return const MiniTimerPill();
+      body = const MiniTimerPill();
+    } else {
+      body = Consumer<TimerController>(
+        builder: (context, timer, _) {
+          final Widget screen;
+          final String key;
+
+          if (timer.awaitingCycleAck) {
+            screen = const SessionCompleteScreen();
+            key = 'complete';
+          } else if (timer.phase == TimerPhase.shortBreak ||
+              timer.phase == TimerPhase.longBreak) {
+            screen = const BreakScreen();
+            key = 'break-${timer.phase.name}';
+          } else {
+            screen = const HomeScreen();
+            key = 'home';
+          }
+
+          return AnimatedSwitcher(
+            duration: const Duration(milliseconds: 320),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 0.04),
+                  end: Offset.zero,
+                ).animate(animation),
+                child: child,
+              ),
+            ),
+            child: KeyedSubtree(key: ValueKey(key), child: screen),
+          );
+        },
+      );
     }
 
-    return Consumer<TimerController>(
-      builder: (context, timer, _) {
-        final Widget screen;
-        final String key;
-
-        if (timer.awaitingCycleAck) {
-          screen = const SessionCompleteScreen();
-          key = 'complete';
-        } else if (timer.phase == TimerPhase.shortBreak ||
-            timer.phase == TimerPhase.longBreak) {
-          screen = const BreakScreen();
-          key = 'break-${timer.phase.name}';
-        } else {
-          screen = const HomeScreen();
-          key = 'home';
-        }
-
-        return AnimatedSwitcher(
-          duration: const Duration(milliseconds: 320),
-          switchInCurve: Curves.easeOut,
-          switchOutCurve: Curves.easeIn,
-          transitionBuilder: (child, animation) => FadeTransition(
-            opacity: animation,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, 0.04),
-                end: Offset.zero,
-              ).animate(animation),
-              child: child,
-            ),
-          ),
-          child: KeyedSubtree(key: ValueKey(key), child: screen),
-        );
+    // Desktop shortcut: Esc exits the floating mini/PiP window. We guard on
+    // isMiniMode so Esc is a no-op in the full window (and exitMiniMode itself
+    // is idempotent). The Focus is non-autofocusing to avoid fighting the home
+    // body's autofocus Focus when in full mode; Esc still reaches the binding
+    // via focus traversal / the focused descendant.
+    return CallbackShortcuts(
+      bindings: <ShortcutActivator, VoidCallback>{
+        const SingleActivator(LogicalKeyboardKey.escape): () {
+          if (windowService.isMiniMode) {
+            windowService.exitMiniMode();
+          }
+        },
       },
+      child: Focus(
+        child: body,
+      ),
     );
   }
 }

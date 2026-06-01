@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_typography.dart';
 
 import '../../controllers/settings_controller.dart';
 import '../../controllers/timer_controller.dart';
+import '../../controllers/history_controller.dart';
 import '../../screens/settings/timer_settings_screen.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../models/pomodoro_state.dart';
@@ -31,8 +33,29 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: t.bg,
       body: SafeArea(
-        child: Consumer<TimerController>(
-          builder: (context, timer, _) => _HomeContent(timer: timer, t: t),
+        // Desktop shortcut: Space toggles pause/resume. We read the timer fresh
+        // in the callback (not the Consumer's instance) so the binding stays
+        // valid regardless of rebuilds. Space only acts on a live (running or
+        // paused) timer — it never auto-starts an idle one. The autofocusing
+        // Focus wraps only the home body (no text fields live here; task entry
+        // is a separate route), so it won't swallow keystrokes in text input.
+        child: CallbackShortcuts(
+          bindings: <ShortcutActivator, VoidCallback>{
+            const SingleActivator(LogicalKeyboardKey.space): () {
+              final timer = context.read<TimerController>();
+              if (timer.status == TimerStatus.running) {
+                timer.pause();
+              } else if (timer.status == TimerStatus.paused) {
+                timer.start();
+              }
+            },
+          },
+          child: Focus(
+            autofocus: true,
+            child: Consumer<TimerController>(
+              builder: (context, timer, _) => _HomeContent(timer: timer, t: t),
+            ),
+          ),
         ),
       ),
     );
@@ -52,6 +75,14 @@ class _HomeContent extends StatelessWidget {
     final isFocusIdle =
         timer.status == TimerStatus.idle && timer.phase == TimerPhase.focus;
     final settings = context.watch<SettingsController>();
+    final history = context.watch<HistoryController>();
+    final peak = history.peakHours.firstOrNull;
+    final peakLabel = peak == null
+        ? null
+        : () {
+            final h = peak.hour;
+            return '${h == 0 ? 12 : h > 12 ? h - 12 : h} ${h >= 12 ? 'pm' : 'am'}';
+          }();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -65,13 +96,13 @@ class _HomeContent extends StatelessWidget {
         const SizedBox(height: 8),
         if (settings.showProjectRow)
           _ProjectTaskRow(t: t, timer: timer),
-        if (settings.showNudgeCard && isFocusIdle) ...[
+        if (settings.showNudgeCard && isFocusIdle && peakLabel != null) ...[
           const SizedBox(height: 4),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 22),
             child: NudgeCard(
-              message: "You're usually a beast at 10:14 am. Want to pop one?",
-              highlightedTime: '10:14 am',
+              message: "You're usually a beast at $peakLabel. Want to pop one?",
+              highlightedTime: peakLabel,
               surfaceColor: t.surface,
               borderColor: t.border,
               accentColor: t.pop,
@@ -109,84 +140,134 @@ class _TopBar extends StatelessWidget {
           PopWordmark(fontSize: 24, color: t.ink, accentColor: t.pop),
           Row(
             children: [
-              GestureDetector(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: (_) => const ProjectsScreen()),
-                ),
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: t.surface,
-                    border: Border.all(color: t.border),
+              Semantics(
+                button: true,
+                label: 'Projects',
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => const ProjectsScreen()),
                   ),
-                  child: Icon(Icons.folder_outlined, size: 16, color: t.ink2),
+                  behavior: HitTestBehavior.opaque,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                    child: Center(
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: t.surface,
+                          border: Border.all(color: t.border),
+                        ),
+                        child: Icon(Icons.folder_outlined, size: 16, color: t.ink2),
+                      ),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: (_) => const TodayScreen()),
-                ),
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: t.surface,
-                    border: Border.all(color: t.border),
+              Semantics(
+                button: true,
+                label: 'Today',
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => const TodayScreen()),
                   ),
-                  child: Icon(Icons.today_rounded, size: 16, color: t.ink2),
+                  behavior: HitTestBehavior.opaque,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                    child: Center(
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: t.surface,
+                          border: Border.all(color: t.border),
+                        ),
+                        child: Icon(Icons.today_rounded, size: 16, color: t.ink2),
+                      ),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                      builder: (_) => const BuddiesScreen()),
-                ),
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: t.surface,
-                    border: Border.all(color: t.border),
+              Semantics(
+                button: true,
+                label: 'Buddies',
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                        builder: (_) => const BuddiesScreen()),
                   ),
-                  child: Icon(Icons.people_rounded, size: 16, color: t.ink2),
+                  behavior: HitTestBehavior.opaque,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                    child: Center(
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: t.surface,
+                          border: Border.all(color: t.border),
+                        ),
+                        child: Icon(Icons.people_rounded, size: 16, color: t.ink2),
+                      ),
+                    ),
+                  ),
                 ),
               ),
               if (WindowService.isDesktop) ...[
                 const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () => context.read<WindowService>().enterMiniMode(),
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: t.surface,
-                      border: Border.all(color: t.border),
+                Semantics(
+                  button: true,
+                  label: 'Mini mode',
+                  child: GestureDetector(
+                    onTap: () => context.read<WindowService>().enterMiniMode(),
+                    behavior: HitTestBehavior.opaque,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                      child: Center(
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: t.surface,
+                            border: Border.all(color: t.border),
+                          ),
+                          child: Icon(Icons.picture_in_picture_alt_rounded, size: 16, color: t.ink2),
+                        ),
+                      ),
                     ),
-                    child: Icon(Icons.picture_in_picture_alt_rounded, size: 16, color: t.ink2),
                   ),
                 ),
               ],
               const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
-                ),
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: t.surface,
-                    border: Border.all(color: t.border),
+              Semantics(
+                button: true,
+                label: 'Settings',
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
                   ),
-                  child: Icon(Icons.tune_rounded, size: 16, color: t.ink2),
+                  behavior: HitTestBehavior.opaque,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                    child: Center(
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: t.surface,
+                          border: Border.all(color: t.border),
+                        ),
+                        child: Icon(Icons.tune_rounded, size: 16, color: t.ink2),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -231,19 +312,25 @@ class _GreetingRow extends StatelessWidget {
             inkColor: t.ink,
           ),
           const SizedBox(width: 12),
-          Column(
+          Expanded(
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 _dateLabel(),
                 style: TextStyle(fontFamily: AppFonts.mono, fontSize: 10, color: t.ink3, letterSpacing: 0.08),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               Text(
                 _greeting(),
                 style: TextStyle(fontFamily: AppFonts.display, fontSize: 22, color: t.ink, height: 1.1),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
+            ),
           ),
         ],
       ),
@@ -289,37 +376,62 @@ class _TimerCenter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appearance = context.read<SettingsController>().timerAppearance;
+    final isPaused = timer.status == TimerStatus.paused;
     return LayoutBuilder(builder: (context, c) {
       final size = (c.maxWidth * 0.78).clamp(200.0, 320.0);
       return Center(
         child: GestureDetector(
+          onTap: () {
+            final snd = context.read<SoundService>();
+            switch (timer.status) {
+              case TimerStatus.running:
+                snd.playSwitch();
+                timer.pause();
+              case TimerStatus.paused:
+                snd.playSwitch();
+                timer.start();
+              case TimerStatus.idle:
+              case TimerStatus.complete:
+                if (timer.phase == TimerPhase.focus) {
+                  // Task sheet plays its own switch sound on confirm.
+                  showTaskInputSheet(context);
+                } else {
+                  snd.playSwitch();
+                  timer.start();
+                }
+            }
+          },
           onLongPress: () => Navigator.of(context).push(
             MaterialPageRoute<void>(builder: (_) => const TimerSettingsScreen()),
           ),
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 280),
-            switchInCurve: Curves.easeOut,
-            switchOutCurve: Curves.easeIn,
-            transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
-            child: KeyedSubtree(
-              key: ValueKey(appearance),
-              child: TimerDisplay(
-                appearance: appearance,
-                progress: timer.progress,
-                timeDisplay: timer.timeDisplay,
-                sessionLabel: timer.sessionDisplay,
-                taskName: timer.taskName.isNotEmpty ? timer.taskName : null,
-                ringColor: _accentColor,
-                trackColor: t.surface2,
-                inkColor: t.ink,
-                ink2Color: t.ink2,
-                ink3Color: t.ink3,
-                surfaceColor: t.surface,
-                borderColor: t.border,
-                bumpColor: t.bump,
-                bumpEdgeColor: t.bumpEdge,
-                size: size,
-                strokeWidth: size * 0.045,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 200),
+            opacity: isPaused ? 0.5 : 1.0,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 280),
+              switchInCurve: Curves.easeOut,
+              switchOutCurve: Curves.easeIn,
+              transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
+              child: KeyedSubtree(
+                key: ValueKey(appearance),
+                child: TimerDisplay(
+                  appearance: appearance,
+                  progress: timer.progress,
+                  timeDisplay: timer.timeDisplay,
+                  sessionLabel: timer.sessionDisplay,
+                  taskName: timer.taskName.isNotEmpty ? timer.taskName : null,
+                  ringColor: _accentColor,
+                  trackColor: t.surface2,
+                  inkColor: t.ink,
+                  ink2Color: t.ink2,
+                  ink3Color: t.ink3,
+                  surfaceColor: t.surface,
+                  borderColor: t.border,
+                  bumpColor: t.bump,
+                  bumpEdgeColor: t.bumpEdge,
+                  size: size,
+                  strokeWidth: size * 0.045,
+                ),
               ),
             ),
           ),
@@ -339,11 +451,18 @@ class _SessionInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isPaused = timer.status == TimerStatus.paused;
     return Column(
       children: [
         Text(
-          timer.sessionDisplay,
-          style: TextStyle(fontFamily: AppFonts.mono, fontSize: 10, color: t.ink3, letterSpacing: 0.14),
+          isPaused ? 'PAUSED' : timer.sessionDisplay,
+          style: TextStyle(
+            fontFamily: AppFonts.mono,
+            fontSize: 10,
+            color: isPaused ? t.ink2 : t.ink3,
+            letterSpacing: isPaused ? 0.24 : 0.14,
+            fontWeight: isPaused ? FontWeight.w700 : FontWeight.w400,
+          ),
           textAlign: TextAlign.center,
         ),
         if (timer.taskName.isNotEmpty)
@@ -375,7 +494,7 @@ class _ActionRow extends StatelessWidget {
   final TimerController timer;
   final AppTokens t;
 
-  void _onPrimary(BuildContext context) {
+  Future<void> _onPrimary(BuildContext context) async {
     final snd = context.read<SoundService>();
     final isIdle = timer.status == TimerStatus.idle;
     final isComplete = timer.status == TimerStatus.complete;
@@ -387,9 +506,36 @@ class _ActionRow extends StatelessWidget {
       snd.playSwitch();
       timer.start();
     } else if (timer.phase == TimerPhase.focus) {
-      // Running/paused focus: abandon it without recording a session.
-      snd.playSwitch();
-      timer.cancelFocus();
+      // Running/paused focus: confirm before abandoning it (nothing is recorded).
+      final discard = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: t.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'Discard this focus?',
+            style: TextStyle(fontFamily: AppFonts.ui, fontWeight: FontWeight.w600, color: t.ink),
+          ),
+          content: Text(
+            "It won't be saved.",
+            style: TextStyle(fontFamily: AppFonts.ui, fontSize: 13, color: t.ink2),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text('Keep going', style: TextStyle(color: t.ink2, fontFamily: AppFonts.ui)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text('Discard', style: TextStyle(color: t.ember, fontFamily: AppFonts.ui, fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+      );
+      if (discard == true && context.mounted) {
+        snd.playSwitch();
+        timer.cancelFocus();
+      }
     } else {
       // Running/paused break: skip ahead to the next focus phase.
       snd.playSwitch();
@@ -443,7 +589,7 @@ class _ActionRow extends StatelessWidget {
             borderColor: t.border,
             ink2Color: t.ink2,
           ),
-          if (isRunning && timer.phase == TimerPhase.focus) ...[
+          if ((isRunning || isPaused) && timer.phase == TimerPhase.focus) ...[
             const SizedBox(width: 10),
             PopButton(
               label: '+ 5',

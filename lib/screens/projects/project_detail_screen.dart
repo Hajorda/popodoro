@@ -114,6 +114,32 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           onSelected: (v) async {
             if (v == 'archive') {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  backgroundColor: t.surface,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  title: Text(
+                    'Archive this project?',
+                    style: TextStyle(fontFamily: AppFonts.ui, fontWeight: FontWeight.w600, color: t.ink),
+                  ),
+                  content: Text(
+                    'You can restore it later from Projects → Archived.',
+                    style: TextStyle(fontFamily: AppFonts.ui, fontSize: 13, color: t.ink2),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: Text('Cancel', style: TextStyle(color: t.ink2, fontFamily: AppFonts.ui)),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: Text('Archive', style: TextStyle(color: t.ember, fontFamily: AppFonts.ui, fontWeight: FontWeight.w600)),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed != true || !context.mounted) return;
               await context.read<ProjectController>().archiveProject(project.id);
               if (context.mounted) Navigator.of(context).pop();
             }
@@ -246,10 +272,12 @@ class _NativeTasksViewState extends State<_NativeTasksView> {
           _AddTaskField(
             controller: _ctrl,
             t: t,
-            onSubmit: () async {
+            onSubmit: (estimate) async {
               final title = _ctrl.text.trim();
               if (title.isNotEmpty) {
-                await context.read<ProjectController>().addTask(title: title);
+                await context
+                    .read<ProjectController>()
+                    .addTask(title: title, expectedPomodoros: estimate);
               }
               _ctrl.clear();
               setState(() => _adding = false);
@@ -289,8 +317,28 @@ class _NativeTaskRow extends StatelessWidget {
         children: [
           GestureDetector(
             onTap: task.isCompleted
-                ? null
-                : () => context.read<ProjectController>().completeTask(task.id),
+                ? () => context.read<ProjectController>().uncompleteTask(task.id)
+                : () async {
+                    final controller = context.read<ProjectController>();
+                    final messenger = ScaffoldMessenger.of(context);
+                    await controller.completeTask(task.id);
+                    if (!context.mounted) return;
+                    messenger
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Completed "${task.title}"',
+                            style: TextStyle(fontFamily: AppFonts.ui),
+                          ),
+                          action: SnackBarAction(
+                            label: 'Undo',
+                            onPressed: () =>
+                                controller.uncompleteTask(task.id),
+                          ),
+                        ),
+                      );
+                  },
             child: Container(
               width: 20,
               height: 20,
@@ -366,22 +414,34 @@ class _PomodoroProgress extends StatelessWidget {
   }
 }
 
-class _AddTaskField extends StatelessWidget {
+class _AddTaskField extends StatefulWidget {
   const _AddTaskField({required this.controller, required this.t, required this.onSubmit, required this.onCancel});
   final TextEditingController controller;
   final AppTokens t;
-  final VoidCallback onSubmit;
+  final ValueChanged<int> onSubmit;
   final VoidCallback onCancel;
 
   @override
+  State<_AddTaskField> createState() => _AddTaskFieldState();
+}
+
+class _AddTaskFieldState extends State<_AddTaskField> {
+  int _estimate = 0;
+
+  void _bump(int delta) {
+    setState(() => _estimate = (_estimate + delta).clamp(0, 20));
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final t = widget.t;
     return Row(
       children: [
         Expanded(
           child: TextField(
-            controller: controller,
+            controller: widget.controller,
             autofocus: true,
-            onSubmitted: (_) => onSubmit(),
+            onSubmitted: (_) => widget.onSubmit(_estimate),
             style: TextStyle(fontFamily: AppFonts.ui, fontSize: 14, color: t.ink),
             decoration: InputDecoration(
               hintText: 'Task name',
@@ -390,10 +450,61 @@ class _AddTaskField extends StatelessWidget {
             ),
           ),
         ),
-        GestureDetector(onTap: onSubmit, child: Icon(Icons.check_rounded, size: 18, color: t.sage)),
+        _EstimateStepper(estimate: _estimate, t: t, onBump: _bump),
+        const SizedBox(width: 10),
+        GestureDetector(onTap: () => widget.onSubmit(_estimate), child: Icon(Icons.check_rounded, size: 18, color: t.sage)),
         const SizedBox(width: 8),
-        GestureDetector(onTap: onCancel, child: Icon(Icons.close_rounded, size: 18, color: t.ink3)),
+        GestureDetector(onTap: widget.onCancel, child: Icon(Icons.close_rounded, size: 18, color: t.ink3)),
       ],
+    );
+  }
+}
+
+class _EstimateStepper extends StatelessWidget {
+  const _EstimateStepper({required this.estimate, required this.t, required this.onBump});
+  final int estimate;
+  final AppTokens t;
+  final ValueChanged<int> onBump;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = estimate == 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: t.surface2,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.local_florist_rounded, size: 12, color: muted ? t.ink3 : t.ember),
+          GestureDetector(
+            onTap: () => onBump(-1),
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Icon(Icons.remove_rounded, size: 14, color: t.ink3),
+            ),
+          ),
+          SizedBox(
+            width: 14,
+            child: Text(
+              '$estimate',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontFamily: AppFonts.mono, fontSize: 12, color: muted ? t.ink3 : t.ink),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => onBump(1),
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Icon(Icons.add_rounded, size: 14, color: t.ink3),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -414,6 +525,15 @@ class _ObsidianTasksView extends StatelessWidget {
             .toList();
 
     if (tasks.isEmpty) {
+      // A linked file that no longer exists on disk was moved/renamed: its
+      // tasks silently vanish. Surface a distinct relink state instead of the
+      // cheerful "all complete" empty state so it isn't mistaken for done.
+      final missing = project.obsidianPaths.isEmpty
+          ? const <String>[]
+          : obsidian.missingPaths(project.obsidianPaths);
+      if (missing.isNotEmpty) {
+        return _RelinkPrompt(project: project, t: t, color: color);
+      }
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -433,15 +553,22 @@ class _ObsidianTasksView extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Row(
                   children: [
-                    Container(
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: t.border, width: 1.5),
+                    GestureDetector(
+                      onTap: () => context.read<ObsidianService>().markTaskComplete(task),
+                      behavior: HitTestBehavior.opaque,
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: t.border, width: 1.5),
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -464,6 +591,62 @@ class _ObsidianTasksView extends StatelessWidget {
                 ),
               ))
           .toList(),
+    );
+  }
+}
+
+// Shown when a project's linked .md files were moved/renamed (no longer exist)
+// and nothing is pending — lets the user re-pick the files to repair the link.
+class _RelinkPrompt extends StatelessWidget {
+  const _RelinkPrompt({required this.project, required this.t, required this.color});
+  final Project project;
+  final AppTokens t;
+  final Color color;
+
+  Future<void> _relink(BuildContext context) async {
+    final controller = context.read<ProjectController>();
+    final picked = await context.read<ObsidianService>().pickFiles();
+    if (picked.isEmpty || !context.mounted) return;
+    await controller.updateProjectPaths(project.id, picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.link_off_rounded, size: 40, color: t.border),
+          const SizedBox(height: 12),
+          Text(
+            'Linked file moved or deleted',
+            style: TextStyle(fontFamily: AppFonts.ui, fontSize: 14, color: t.ink2),
+          ),
+          const SizedBox(height: 16),
+          GestureDetector(
+            onTap: () => _relink(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: color.withOpacity(0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.link_rounded, size: 16, color: color),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Relink files',
+                    style: TextStyle(fontFamily: AppFonts.ui, fontSize: 14, fontWeight: FontWeight.w600, color: color),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -532,7 +715,9 @@ class _HistoryTabState extends State<_HistoryTab> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _shortRef(h.taskRef),
+                          (h.taskTitle != null && h.taskTitle!.isNotEmpty)
+                              ? h.taskTitle!
+                              : _shortRef(h.taskRef),
                           style: TextStyle(fontFamily: AppFonts.ui, fontSize: 13, color: t.ink),
                           overflow: TextOverflow.ellipsis,
                         ),
