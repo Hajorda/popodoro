@@ -227,7 +227,7 @@ class DesktopTrayService with WindowListener, TrayListener {
     if (!kIsWeb && Platform.isMacOS) {
       return 'assets/icon/tray_icon.png';
     }
-    return 'assets/icon/icon.png';
+    return 'assets/icon/tray_icon.ico';
   }
 
   void dispose() {

@@ -108,6 +108,7 @@ class _TimerRingState extends State<TimerRing>
                   ),
                   const SizedBox(height: 4),
                   FittedBox(
+                    fit: BoxFit.scaleDown,
                     child: Text(
                       widget.timeDisplay,
                       style: TextStyle(fontFamily: AppFonts.display, 
