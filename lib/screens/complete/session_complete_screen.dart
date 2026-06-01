@@ -39,7 +39,12 @@ class _CompleteContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Column(
+        LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: IntrinsicHeight(
+                child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 24),
@@ -130,6 +135,10 @@ class _CompleteContent extends StatelessWidget {
         ),
         const SizedBox(height: 32),
       ],
+                ),
+              ),
+            ),
+          ),
         ),
         if (WindowService.isDesktop)
           Positioned(
