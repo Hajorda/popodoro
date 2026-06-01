@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../controllers/timer_controller.dart';
 import '../models/pomodoro_state.dart';
+import '../services/together_service.dart';
 import '../services/window_service.dart';
 import '../widgets/pip/mini_timer_pill.dart';
 import 'break/break_screen.dart';
@@ -11,8 +12,101 @@ import 'home/home_screen.dart';
 
 // Top-level screen router. Watches WindowService (mini mode) and TimerController
 // and swaps between the four surfaces: MiniTimerPill, Home, Break, SessionComplete.
-class PopodoroShell extends StatelessWidget {
+//
+// It also owns the reactive "auto-exit mini mode when a session finishes" rule:
+// it listens to TimerController and TogetherService, and when either signals a
+// finished session it calls WindowService.exitMiniMode() so the floating PiP
+// window is never left stranded on screen.
+class PopodoroShell extends StatefulWidget {
   const PopodoroShell({super.key});
+
+  @override
+  State<PopodoroShell> createState() => _PopodoroShellState();
+}
+
+class _PopodoroShellState extends State<PopodoroShell> {
+  TimerController? _timer;
+  TogetherService? _together;
+  WindowService? _windowService;
+
+  // Previous-frame snapshots so we can detect *transitions* (edges) rather than
+  // steady states. This keeps the auto-exit one-shot per finish.
+  TimerStatus? _prevTimerStatus;
+  bool _prevAwaitingCycleAck = false;
+  bool _prevRoomComplete = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final timer = context.read<TimerController>();
+    final together = context.read<TogetherService>();
+    _windowService = context.read<WindowService>();
+
+    if (!identical(timer, _timer)) {
+      _timer?.removeListener(_onTimerChanged);
+      _timer = timer;
+      _timer!.addListener(_onTimerChanged);
+      _prevTimerStatus = timer.status;
+      _prevAwaitingCycleAck = timer.awaitingCycleAck;
+    }
+
+    if (!identical(together, _together)) {
+      _together?.removeListener(_onTogetherChanged);
+      _together = together;
+      _together!.addListener(_onTogetherChanged);
+      _prevRoomComplete = together.room?.isComplete ?? false;
+    }
+  }
+
+  // Solo timer finished: a running phase ended without auto-starting the next
+  // one (status running -> idle/complete), or the cycle-complete gate engaged
+  // (awaitingCycleAck rose). Either way the pill has nothing actionable, so we
+  // pop back to the full window.
+  void _onTimerChanged() {
+    final timer = _timer;
+    if (timer == null) return;
+
+    final status = timer.status;
+    final awaiting = timer.awaitingCycleAck;
+
+    final stoppedRunning = _prevTimerStatus == TimerStatus.running &&
+        (status == TimerStatus.idle || status == TimerStatus.complete);
+    final cycleJustCompleted = awaiting && !_prevAwaitingCycleAck;
+
+    if (stoppedRunning || cycleJustCompleted) {
+      _exitMiniModeIfActive();
+    }
+
+    _prevTimerStatus = status;
+    _prevAwaitingCycleAck = awaiting;
+  }
+
+  // Together co-focus room reached `complete`: the shared session is over, so
+  // get the user out of the floating pill.
+  void _onTogetherChanged() {
+    final roomComplete = _together?.room?.isComplete ?? false;
+    if (roomComplete && !_prevRoomComplete) {
+      _exitMiniModeIfActive();
+    }
+    _prevRoomComplete = roomComplete;
+  }
+
+  // Guarded + idempotent: only acts while in mini mode; exitMiniMode itself also
+  // no-ops when already in full mode.
+  void _exitMiniModeIfActive() {
+    final ws = _windowService;
+    if (ws != null && ws.isMiniMode) {
+      ws.exitMiniMode();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.removeListener(_onTimerChanged);
+    _together?.removeListener(_onTogetherChanged);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

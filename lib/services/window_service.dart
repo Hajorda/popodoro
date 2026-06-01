@@ -37,6 +37,10 @@ class WindowService extends ChangeNotifier {
 
   Future<void> exitMiniMode() async {
     if (!isDesktop) return;
+    // Idempotent: callers (e.g. reactive listeners on session-finish) may fire
+    // this more than once. Bail early if we're already in full mode so we don't
+    // re-run window-manager calls or overwrite the saved mini position.
+    if (!_isMiniMode) return;
     await _saveCurrentPosition();
     await windowManager.setAlwaysOnTop(false);
     await windowManager.setSkipTaskbar(false);

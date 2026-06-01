@@ -28,6 +28,54 @@ class MiniTimerPill extends StatelessWidget {
     final room = together.room;
     final inCoFocus = together.isInRoom && room != null && (room.isFocusing || room.isOnBreak);
 
+    // If we're still in a room but the shared session is no longer live (e.g.
+    // it just completed), don't fall through to the misleading idle SOLO pill.
+    // Show a dedicated "session over" pill whose only action exits mini mode,
+    // guaranteeing an escape hatch even if the reactive auto-exit hasn't fired
+    // yet (or the user entered mini mode after the room already completed).
+    if (together.isInRoom && room != null && !inCoFocus) {
+      return GestureDetector(
+        onPanStart: (_) => _startDragging(),
+        child: Material(
+          color: t.bg,
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: t.border, width: 0.5)),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: t.sage),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    room.isComplete ? 'SESSION DONE' : 'TOGETHER',
+                    style: TextStyle(
+                      fontFamily: AppFonts.mono,
+                      fontSize: 11,
+                      letterSpacing: 0.12,
+                      color: t.ink2,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                _PillIconButton(
+                  icon: Icons.open_in_full_rounded,
+                  color: t.ink2,
+                  onTap: () => windowService.exitMiniMode(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     if (inCoFocus) {
       final dotColor = room.isOnBreak ? t.sage : t.pop;
       final label = room.isOnBreak ? 'SHORT BREAK' : 'TOGETHER';
