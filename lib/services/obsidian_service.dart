@@ -159,6 +159,11 @@ class ObsidianService extends ChangeNotifier {
     return results.map((f) => f.path).toList();
   }
 
+  // Returns the subset of [paths] whose files no longer exist on disk
+  // (e.g. a linked .md file was moved or renamed in the vault).
+  List<String> missingPaths(List<String> paths) =>
+      paths.where((path) => !File(path).existsSync()).toList();
+
   // Returns pending tasks from a list of specific file paths.
   Future<List<ObsidianTask>> tasksForFiles(List<String> filePaths) async {
     final results = <ObsidianTask>[];

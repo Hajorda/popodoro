@@ -164,6 +164,14 @@ class ProjectController extends ChangeNotifier {
     await _load();
   }
 
+  Future<void> uncompleteTask(String taskId) async {
+    await _projectService.uncompleteTask(taskId);
+    if (_activeProject != null) {
+      _nativeTasks = await _projectService.fetchTasks(_activeProject!.id);
+    }
+    await _load();
+  }
+
   Future<void> deleteTask(String taskId) async {
     await _projectService.deleteTask(taskId);
     if (_activeProject != null) {
@@ -173,11 +181,24 @@ class ProjectController extends ChangeNotifier {
     await _load();
   }
 
+  Future<void> updateProjectPaths(String id, List<String> paths) async {
+    await _projectService.updateProjectPaths(id, paths);
+    await _load();
+  }
+
   Future<void> archiveProject(String id) async {
     await _projectService.archiveProject(id);
     if (_activeProject?.id == id) clearSelection();
     await _load();
   }
+
+  Future<void> unarchiveProject(String id) async {
+    await _projectService.unarchiveProject(id);
+    await _load();
+  }
+
+  Future<List<Project>> fetchArchivedProjects() =>
+      _projectService.fetchArchivedProjects();
 
   // ── Session completion hook ───────────────────────────────────────────────────
 

@@ -301,6 +301,13 @@ class AppDatabase {
         whereArgs: [taskId],
       );
 
+  Future<void> uncompleteTask(String taskId) => _db.update(
+        'project_tasks',
+        {'is_completed': 0},
+        where: 'id = ?',
+        whereArgs: [taskId],
+      );
+
   Future<void> deleteTask(String taskId) => _db.delete(
         'project_tasks',
         where: 'id = ?',

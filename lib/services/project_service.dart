@@ -62,7 +62,36 @@ class ProjectService {
     ));
   }
 
+  Future<void> updateProjectPaths(String id, List<String> obsidianPaths) async {
+    final rows = await _db.fetchProjects(includeArchived: true);
+    final row = rows.firstWhere((r) => r.id == id);
+    await _db.upsertProject(
+      Project.fromRow(row).copyWith(obsidianPaths: obsidianPaths).toRow(),
+    );
+  }
+
   Future<void> archiveProject(String id) => _db.archiveProject(id);
+
+  Future<void> unarchiveProject(String id) async {
+    final rows = await _db.fetchProjects(includeArchived: true);
+    final row = rows.firstWhere((r) => r.id == id);
+    await _db.upsertProject(ProjectRow(
+      id: row.id,
+      name: row.name,
+      color: row.color,
+      type: row.type,
+      obsidianPath: row.obsidianPath,
+      createdAt: row.createdAt,
+      archived: false,
+    ));
+  }
+
+  Future<List<Project>> fetchArchivedProjects() async {
+    final all = await fetchProjects(includeArchived: true);
+    final active = await fetchProjects();
+    final activeIds = active.map((p) => p.id).toSet();
+    return all.where((p) => !activeIds.contains(p.id)).toList();
+  }
 
   Future<void> deleteProject(String id) => _db.deleteProject(id);
 
@@ -98,6 +127,8 @@ class ProjectService {
   }
 
   Future<void> completeTask(String taskId) => _db.completeTask(taskId);
+
+  Future<void> uncompleteTask(String taskId) => _db.uncompleteTask(taskId);
 
   Future<void> deleteTask(String taskId) => _db.deleteTask(taskId);
 
