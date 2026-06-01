@@ -157,9 +157,30 @@ class TimerController extends ChangeNotifier {
   }
 
   // User manually skips the current phase (bypasses cycle-complete gate).
+  // NOTE: For a focus phase, this records a completed session and advances the
+  // cycle. To abandon an in-progress focus WITHOUT recording it, use
+  // [cancelFocus] instead. This method remains intended for skipping breaks.
   void skipPhase() {
     _ticker?.cancel();
     _advancePhase(autoStart: false, ignoreCycleGate: true);
+    notifyListeners();
+  }
+
+  // User abandons the current (incomplete) focus phase early. Discards the
+  // in-progress session entirely: NO SessionRecord is created, the completed
+  // count is NOT incremented, and the onSessionComplete/onProjectSessionComplete
+  // callbacks are NOT fired. Returns to a clean idle focus state, like reset().
+  void cancelFocus() {
+    if (_phase != TimerPhase.focus) return;
+    _ticker?.cancel();
+    _status = TimerStatus.idle;
+    _sessionStartTime = null;
+    _taskName = '';
+    _tag = '';
+    _projectId = null;
+    _taskRef = null;
+    _customFocusSeconds = null;
+    _secondsRemaining = totalSecondsForPhase;
     notifyListeners();
   }
 

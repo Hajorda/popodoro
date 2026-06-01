@@ -386,7 +386,12 @@ class _ActionRow extends StatelessWidget {
     } else if (isIdle || isComplete) {
       snd.playSwitch();
       timer.start();
+    } else if (timer.phase == TimerPhase.focus) {
+      // Running/paused focus: abandon it without recording a session.
+      snd.playSwitch();
+      timer.cancelFocus();
     } else {
+      // Running/paused break: skip ahead to the next focus phase.
       snd.playSwitch();
       timer.skipPhase();
     }
@@ -398,7 +403,7 @@ class _ActionRow extends StatelessWidget {
     if (isIdle || isComplete) {
       return timer.phase == TimerPhase.focus ? 'Start focus' : 'Start break';
     }
-    return 'End';
+    return timer.phase == TimerPhase.focus ? 'Cancel' : 'End';
   }
 
   @override
