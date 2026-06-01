@@ -61,17 +61,25 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(builder: (_) => const CreateProjectScreen()),
           ),
+          behavior: HitTestBehavior.opaque,
           child: Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: t.surface,
-                border: Border.all(color: t.border),
+            // Hit area expanded to >=48px for accessibility; the visible 32×32
+            // circle stays centered and unchanged.
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              child: Center(
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: t.surface,
+                    border: Border.all(color: t.border),
+                  ),
+                  child: Icon(Icons.add_rounded, size: 16, color: t.ink),
+                ),
               ),
-              child: Icon(Icons.add_rounded, size: 16, color: t.ink),
             ),
           ),
         ),

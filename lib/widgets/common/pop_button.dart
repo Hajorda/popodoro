@@ -44,7 +44,9 @@ class PopButton extends StatelessWidget {
       fontSize: fontSize,
       fontWeight: FontWeight.w600,
       letterSpacing: -0.005 * fontSize,
-      height: 1.0,
+      // Natural-ish leading (was 1.0) so ascenders/descenders don't clip at
+      // large OS text scale.
+      height: 1.1,
     );
 
     switch (variant) {
@@ -79,19 +81,27 @@ class PopButton extends StatelessWidget {
         );
 
       case PopButtonVariant.icon:
-        return GestureDetector(
+        return _Pressable(
           onTap: onPressed,
-          child: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: surfaceColor,
-              border: Border.all(color: borderColor),
-            ),
+          behavior: HitTestBehavior.opaque,
+          // Hit area expanded to >=48px for accessibility; the visible 40×40
+          // circle stays centered and unchanged.
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
             child: Center(
-              child: icon ??
-                  Text(label, style: baseStyle.copyWith(color: inkColor)),
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: surfaceColor,
+                  border: Border.all(color: borderColor),
+                ),
+                child: Center(
+                  child: icon ??
+                      Text(label, style: baseStyle.copyWith(color: inkColor)),
+                ),
+              ),
             ),
           ),
         );
@@ -106,7 +116,7 @@ class PopButton extends StatelessWidget {
     required double vPad,
     BorderSide? border,
   }) {
-    return GestureDetector(
+    return _Pressable(
       onTap: onPressed,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
@@ -120,8 +130,69 @@ class PopButton extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[icon!, const SizedBox(width: 6)],
-            Text(label, style: textStyle),
+            // Degrade gracefully if the label is long or text scale is large.
+            Flexible(
+              child: Text(
+                label,
+                style: textStyle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// Wraps a control's tap area to add desktop affordances missing from a bare
+// GestureDetector: a pointer (click) cursor on hover and a brief press-down
+// scale cue. When [onTap] is null the control is treated as disabled — no
+// cursor change and no press animation — so this is also safe for any
+// future loading/disabled states.
+class _Pressable extends StatefulWidget {
+  const _Pressable({
+    required this.child,
+    required this.onTap,
+    this.behavior,
+  });
+
+  final Widget child;
+  final VoidCallback? onTap;
+  final HitTestBehavior? behavior;
+
+  @override
+  State<_Pressable> createState() => _PressableState();
+}
+
+class _PressableState extends State<_Pressable> {
+  bool _pressed = false;
+
+  bool get _enabled => widget.onTap != null;
+
+  void _setPressed(bool value) {
+    if (!_enabled || _pressed == value) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: _enabled
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.basic,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        behavior: widget.behavior,
+        onTapDown: (_) => _setPressed(true),
+        onTapUp: (_) => _setPressed(false),
+        onTapCancel: () => _setPressed(false),
+        child: AnimatedScale(
+          scale: _pressed ? 0.97 : 1.0,
+          duration: const Duration(milliseconds: 80),
+          curve: Curves.easeOut,
+          child: widget.child,
         ),
       ),
     );

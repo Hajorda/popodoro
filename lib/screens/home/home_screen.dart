@@ -118,84 +118,134 @@ class _TopBar extends StatelessWidget {
           PopWordmark(fontSize: 24, color: t.ink, accentColor: t.pop),
           Row(
             children: [
-              GestureDetector(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: (_) => const ProjectsScreen()),
-                ),
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: t.surface,
-                    border: Border.all(color: t.border),
+              Semantics(
+                button: true,
+                label: 'Projects',
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => const ProjectsScreen()),
                   ),
-                  child: Icon(Icons.folder_outlined, size: 16, color: t.ink2),
+                  behavior: HitTestBehavior.opaque,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                    child: Center(
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: t.surface,
+                          border: Border.all(color: t.border),
+                        ),
+                        child: Icon(Icons.folder_outlined, size: 16, color: t.ink2),
+                      ),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: (_) => const TodayScreen()),
-                ),
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: t.surface,
-                    border: Border.all(color: t.border),
+              Semantics(
+                button: true,
+                label: 'Today',
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => const TodayScreen()),
                   ),
-                  child: Icon(Icons.today_rounded, size: 16, color: t.ink2),
+                  behavior: HitTestBehavior.opaque,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                    child: Center(
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: t.surface,
+                          border: Border.all(color: t.border),
+                        ),
+                        child: Icon(Icons.today_rounded, size: 16, color: t.ink2),
+                      ),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                      builder: (_) => const BuddiesScreen()),
-                ),
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: t.surface,
-                    border: Border.all(color: t.border),
+              Semantics(
+                button: true,
+                label: 'Buddies',
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                        builder: (_) => const BuddiesScreen()),
                   ),
-                  child: Icon(Icons.people_rounded, size: 16, color: t.ink2),
+                  behavior: HitTestBehavior.opaque,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                    child: Center(
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: t.surface,
+                          border: Border.all(color: t.border),
+                        ),
+                        child: Icon(Icons.people_rounded, size: 16, color: t.ink2),
+                      ),
+                    ),
+                  ),
                 ),
               ),
               if (WindowService.isDesktop) ...[
                 const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () => context.read<WindowService>().enterMiniMode(),
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: t.surface,
-                      border: Border.all(color: t.border),
+                Semantics(
+                  button: true,
+                  label: 'Mini mode',
+                  child: GestureDetector(
+                    onTap: () => context.read<WindowService>().enterMiniMode(),
+                    behavior: HitTestBehavior.opaque,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                      child: Center(
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: t.surface,
+                            border: Border.all(color: t.border),
+                          ),
+                          child: Icon(Icons.picture_in_picture_alt_rounded, size: 16, color: t.ink2),
+                        ),
+                      ),
                     ),
-                    child: Icon(Icons.picture_in_picture_alt_rounded, size: 16, color: t.ink2),
                   ),
                 ),
               ],
               const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
-                ),
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: t.surface,
-                    border: Border.all(color: t.border),
+              Semantics(
+                button: true,
+                label: 'Settings',
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
                   ),
-                  child: Icon(Icons.tune_rounded, size: 16, color: t.ink2),
+                  behavior: HitTestBehavior.opaque,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                    child: Center(
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: t.surface,
+                          border: Border.all(color: t.border),
+                        ),
+                        child: Icon(Icons.tune_rounded, size: 16, color: t.ink2),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -240,19 +290,25 @@ class _GreetingRow extends StatelessWidget {
             inkColor: t.ink,
           ),
           const SizedBox(width: 12),
-          Column(
+          Expanded(
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 _dateLabel(),
                 style: TextStyle(fontFamily: AppFonts.mono, fontSize: 10, color: t.ink3, letterSpacing: 0.08),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               Text(
                 _greeting(),
                 style: TextStyle(fontFamily: AppFonts.display, fontSize: 22, color: t.ink, height: 1.1),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
+            ),
           ),
         ],
       ),

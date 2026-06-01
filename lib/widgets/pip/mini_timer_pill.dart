@@ -67,6 +67,7 @@ class MiniTimerPill extends StatelessWidget {
                 _PillIconButton(
                   icon: Icons.open_in_full_rounded,
                   color: t.ink2,
+                  label: 'Expand',
                   onTap: () => windowService.exitMiniMode(),
                 ),
               ],
@@ -126,6 +127,7 @@ class MiniTimerPill extends StatelessWidget {
                 _PillIconButton(
                   icon: Icons.open_in_full_rounded,
                   color: t.ink3,
+                  label: 'Expand',
                   onTap: () => windowService.exitMiniMode(),
                 ),
               ],
@@ -182,6 +184,7 @@ class MiniTimerPill extends StatelessWidget {
               _PillIconButton(
                 icon: isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
                 color: t.ink2,
+                label: isRunning ? 'Pause' : 'Resume',
                 onTap: () {
                   if (isRunning) {
                     timer.pause();
@@ -194,6 +197,7 @@ class MiniTimerPill extends StatelessWidget {
               _PillIconButton(
                 icon: Icons.open_in_full_rounded,
                 color: t.ink3,
+                label: 'Expand',
                 onTap: () => windowService.exitMiniMode(),
               ),
             ],
@@ -234,21 +238,34 @@ class _PillIconButton extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.onTap,
+    this.label,
   });
 
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
+  final String? label;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 30,
-        height: 30,
-        child: Icon(icon, size: 16, color: color),
+    return Semantics(
+      button: true,
+      label: label,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        // Hit area expanded to >=48px for accessibility; the visible 30×30
+        // icon box (16px glyph) stays centered and unchanged.
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          child: Center(
+            child: SizedBox(
+              width: 30,
+              height: 30,
+              child: Icon(icon, size: 16, color: color),
+            ),
+          ),
+        ),
       ),
     );
   }

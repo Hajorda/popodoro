@@ -38,7 +38,7 @@ class ChipSelector<T> extends StatelessWidget {
       runSpacing: 8,
       children: options.map((opt) {
         final isActive = opt == selected;
-        return GestureDetector(
+        return _Pressable(
           onTap: () => onSelect(opt),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
@@ -63,6 +63,51 @@ class ChipSelector<T> extends StatelessWidget {
           ),
         );
       }).toList(),
+    );
+  }
+}
+
+// Wraps a chip's tap area to add desktop affordances missing from a bare
+// GestureDetector: a pointer (click) cursor on hover and a brief press-down
+// scale cue. The selected/unselected styling is owned by the child
+// AnimatedContainer and is left untouched.
+class _Pressable extends StatefulWidget {
+  const _Pressable({
+    required this.child,
+    required this.onTap,
+  });
+
+  final Widget child;
+  final VoidCallback onTap;
+
+  @override
+  State<_Pressable> createState() => _PressableState();
+}
+
+class _PressableState extends State<_Pressable> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        onTapDown: (_) => _setPressed(true),
+        onTapUp: (_) => _setPressed(false),
+        onTapCancel: () => _setPressed(false),
+        child: AnimatedScale(
+          scale: _pressed ? 0.97 : 1.0,
+          duration: const Duration(milliseconds: 80),
+          curve: Curves.easeOut,
+          child: widget.child,
+        ),
+      ),
     );
   }
 }
