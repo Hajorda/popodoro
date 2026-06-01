@@ -384,7 +384,7 @@ class _ActionRow extends StatelessWidget {
   final TimerController timer;
   final AppTokens t;
 
-  void _onPrimary(BuildContext context) {
+  Future<void> _onPrimary(BuildContext context) async {
     final snd = context.read<SoundService>();
     final isIdle = timer.status == TimerStatus.idle;
     final isComplete = timer.status == TimerStatus.complete;
@@ -396,9 +396,36 @@ class _ActionRow extends StatelessWidget {
       snd.playSwitch();
       timer.start();
     } else if (timer.phase == TimerPhase.focus) {
-      // Running/paused focus: abandon it without recording a session.
-      snd.playSwitch();
-      timer.cancelFocus();
+      // Running/paused focus: confirm before abandoning it (nothing is recorded).
+      final discard = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: t.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'Discard this focus?',
+            style: TextStyle(fontFamily: AppFonts.ui, fontWeight: FontWeight.w600, color: t.ink),
+          ),
+          content: Text(
+            "It won't be saved.",
+            style: TextStyle(fontFamily: AppFonts.ui, fontSize: 13, color: t.ink2),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text('Keep going', style: TextStyle(color: t.ink2, fontFamily: AppFonts.ui)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text('Discard', style: TextStyle(color: t.ember, fontFamily: AppFonts.ui, fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+      );
+      if (discard == true && context.mounted) {
+        snd.playSwitch();
+        timer.cancelFocus();
+      }
     } else {
       // Running/paused break: skip ahead to the next focus phase.
       snd.playSwitch();
