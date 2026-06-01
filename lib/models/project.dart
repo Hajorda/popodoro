@@ -171,10 +171,12 @@ class TaskPomodoro {
     required this.sessionId,
     required this.completedAt,
     required this.durationMinutes,
+    this.taskTitle,
   });
 
   final String id;
   final String taskRef;
+  final String? taskTitle;
   final String projectId;
   final String sessionId;
   final DateTime completedAt;
@@ -183,6 +185,7 @@ class TaskPomodoro {
   factory TaskPomodoro.fromRow(TaskPomodoroRow row) => TaskPomodoro(
         id: row.id,
         taskRef: row.taskRef,
+        taskTitle: row.taskTitle,
         projectId: row.projectId,
         sessionId: row.sessionId,
         completedAt: DateTime.fromMillisecondsSinceEpoch(row.completedAt),
@@ -192,6 +195,7 @@ class TaskPomodoro {
   TaskPomodoroRow toRow() => TaskPomodoroRow(
         id: id,
         taskRef: taskRef,
+        taskTitle: taskTitle,
         projectId: projectId,
         sessionId: sessionId,
         completedAt: completedAt.millisecondsSinceEpoch,

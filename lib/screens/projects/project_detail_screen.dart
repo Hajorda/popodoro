@@ -715,7 +715,9 @@ class _HistoryTabState extends State<_HistoryTab> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _shortRef(h.taskRef),
+                          (h.taskTitle != null && h.taskTitle!.isNotEmpty)
+                              ? h.taskTitle!
+                              : _shortRef(h.taskRef),
                           style: TextStyle(fontFamily: AppFonts.ui, fontSize: 13, color: t.ink),
                           overflow: TextOverflow.ellipsis,
                         ),

@@ -20,7 +20,7 @@ class AppDatabase {
     final db = await databaseFactory.openDatabase(
       p.join(dbDir.path, 'sessions.db'),
       options: OpenDatabaseOptions(
-        version: 4,
+        version: 5,
         onCreate: (db, _) async {
           await _createAllTables(db);
         },
@@ -93,6 +93,11 @@ class AppDatabase {
               'CREATE INDEX idx_sessions_project        ON sessions(project_id)',
             );
           }
+          if (oldVersion < 5) {
+            await db.execute(
+              'ALTER TABLE task_pomodoros ADD COLUMN task_title TEXT',
+            );
+          }
         },
       ),
     );
@@ -149,6 +154,7 @@ class AppDatabase {
       CREATE TABLE task_pomodoros (
         id               TEXT PRIMARY KEY,
         task_ref         TEXT NOT NULL,
+        task_title       TEXT,
         project_id       TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
         session_id       TEXT NOT NULL,
         completed_at     INTEGER NOT NULL,
@@ -175,7 +181,7 @@ class AppDatabase {
     final db = await databaseFactory.openDatabase(
       inMemoryDatabasePath,
       options: OpenDatabaseOptions(
-        version: 4,
+        version: 5,
         onCreate: (db, _) async {
           await _createAllTables(db);
         },
@@ -487,10 +493,12 @@ class TaskPomodoroRow {
     required this.sessionId,
     required this.completedAt,
     required this.durationMinutes,
+    this.taskTitle,
   });
 
   final String id;
   final String taskRef;
+  final String? taskTitle;
   final String projectId;
   final String sessionId;
   final int completedAt;
@@ -499,6 +507,7 @@ class TaskPomodoroRow {
   Map<String, Object?> toMap() => {
         'id': id,
         'task_ref': taskRef,
+        'task_title': taskTitle,
         'project_id': projectId,
         'session_id': sessionId,
         'completed_at': completedAt,
@@ -508,6 +517,7 @@ class TaskPomodoroRow {
   factory TaskPomodoroRow.fromMap(Map<String, Object?> m) => TaskPomodoroRow(
         id: m['id'] as String,
         taskRef: m['task_ref'] as String,
+        taskTitle: m['task_title'] as String?,
         projectId: m['project_id'] as String,
         sessionId: m['session_id'] as String,
         completedAt: m['completed_at'] as int,

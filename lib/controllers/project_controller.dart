@@ -216,6 +216,7 @@ class ProjectController extends ChangeNotifier {
     await _projectService.recordPomodoro(
       id: _uuid.v4(),
       taskRef: task.taskRef,
+      taskTitle: task.title,
       projectId: project.id,
       sessionId: sessionId,
       durationMinutes: durationMinutes,

@@ -140,10 +140,12 @@ class ProjectService {
     required String projectId,
     required String sessionId,
     required int durationMinutes,
+    String? taskTitle,
   }) =>
       _db.insertTaskPomodoro(TaskPomodoroRow(
         id: id,
         taskRef: taskRef,
+        taskTitle: taskTitle,
         projectId: projectId,
         sessionId: sessionId,
         completedAt: DateTime.now().millisecondsSinceEpoch,
