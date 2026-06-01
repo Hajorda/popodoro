@@ -4,6 +4,7 @@ import '../../core/theme/app_typography.dart';
 
 import '../../controllers/settings_controller.dart';
 import '../../controllers/timer_controller.dart';
+import '../../controllers/history_controller.dart';
 import '../../screens/settings/timer_settings_screen.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../models/pomodoro_state.dart';
@@ -52,6 +53,14 @@ class _HomeContent extends StatelessWidget {
     final isFocusIdle =
         timer.status == TimerStatus.idle && timer.phase == TimerPhase.focus;
     final settings = context.watch<SettingsController>();
+    final history = context.watch<HistoryController>();
+    final peak = history.peakHours.firstOrNull;
+    final peakLabel = peak == null
+        ? null
+        : () {
+            final h = peak.hour;
+            return '${h == 0 ? 12 : h > 12 ? h - 12 : h} ${h >= 12 ? 'pm' : 'am'}';
+          }();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -65,13 +74,13 @@ class _HomeContent extends StatelessWidget {
         const SizedBox(height: 8),
         if (settings.showProjectRow)
           _ProjectTaskRow(t: t, timer: timer),
-        if (settings.showNudgeCard && isFocusIdle) ...[
+        if (settings.showNudgeCard && isFocusIdle && peakLabel != null) ...[
           const SizedBox(height: 4),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 22),
             child: NudgeCard(
-              message: "You're usually a beast at 10:14 am. Want to pop one?",
-              highlightedTime: '10:14 am',
+              message: "You're usually a beast at $peakLabel. Want to pop one?",
+              highlightedTime: peakLabel,
               surfaceColor: t.surface,
               borderColor: t.border,
               accentColor: t.pop,
