@@ -6,10 +6,58 @@ import '../../core/theme/app_typography.dart';
 import '../../services/together_service.dart';
 import '../../widgets/mascot/pop_mascot.dart';
 import '../../widgets/together/buddy_avatar.dart';
+import 'co_focus_screen.dart';
 import 'lobby_screen.dart';
 
-class CompleteScreen extends StatelessWidget {
+class CompleteScreen extends StatefulWidget {
   const CompleteScreen({super.key});
+
+  @override
+  State<CompleteScreen> createState() => _CompleteScreenState();
+}
+
+class _CompleteScreenState extends State<CompleteScreen> {
+  // Fires once when the host restarts the room (status leaves `complete`),
+  // so every participant follows automatically instead of staying stuck here.
+  bool _navigated = false;
+
+  /// In a Together room, react to the host moving the room OUT of `complete`
+  /// (e.g. "Pop another?" → lobby, or straight back to active/break) and
+  /// replace this screen with the matching one for the rest of the group.
+  ///
+  /// This is gated on being in a Together room so a SOLO completion — which
+  /// uses a different widget entirely and has no [TogetherService] room — can
+  /// never trigger navigation here.
+  void _maybeFollowHost(TogetherService together) {
+    if (_navigated) return;
+    final room = together.room;
+    if (room == null) return; // Not a Together session → leave solo flow alone.
+    if (room.isComplete) return; // Still on the complete screen for everyone.
+
+    _navigated = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final target = room.isLobby
+          ? const LobbyScreen()
+          : const CoFocusScreen(); // active / paused / break
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(builder: (_) => target),
+      );
+    });
+  }
+
+  /// Host taps "Pop another?": reset the room, then navigate to the lobby
+  /// ourselves. We claim the [_navigated] guard up front so the Realtime echo
+  /// (which flips the room to `lobby` for everyone) can't double-navigate us.
+  Future<void> _restartAsHost(TogetherService together) async {
+    if (_navigated) return;
+    _navigated = true;
+    await together.resetRoom();
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => const LobbyScreen()),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,6 +65,9 @@ class CompleteScreen extends StatelessWidget {
 
     return Consumer<TogetherService>(
       builder: (context, together, _) {
+        // Detect the host-driven restart and follow it (Together rooms only).
+        _maybeFollowHost(together);
+
         final room = together.room;
         final participants = together.participants;
 
@@ -113,7 +164,11 @@ class CompleteScreen extends StatelessWidget {
                         const Spacer2(height: 32),
 
                         // CTA buttons
-                        _CTAButtons(t: t, together: together),
+                        _CTAButtons(
+                          t: t,
+                          together: together,
+                          onHostRestart: _restartAsHost,
+                        ),
                       ],
                     ),
                   ),
@@ -355,40 +410,47 @@ class _ReactionsCard extends StatelessWidget {
 // ── CTA buttons ───────────────────────────────────────────────────────────────
 
 class _CTAButtons extends StatelessWidget {
-  const _CTAButtons({required this.t, required this.together});
+  const _CTAButtons({
+    required this.t,
+    required this.together,
+    required this.onHostRestart,
+  });
   final AppTokens t;
   final TogetherService together;
 
+  /// Called when the host taps "Pop another?". Resets the room and navigates;
+  /// non-hosts instead follow along automatically via the room-status listener.
+  final Future<void> Function(TogetherService) onHostRestart;
+
   @override
   Widget build(BuildContext context) {
+    final isHost = together.isHost;
     return Column(
       children: [
-        // "Pop another?" — resets the same room back to lobby
+        // "Pop another?" — host resets the same room back to lobby; everyone
+        // else follows automatically once the status change arrives over Realtime.
         SizedBox(
           width: double.infinity,
           child: GestureDetector(
-            onTap: () async {
-              // Host resets the room; non-host just navigates and waits for Realtime.
-              if (together.isHost) await together.resetRoom();
-              if (context.mounted) {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute<void>(builder: (_) => const LobbyScreen()),
-                );
-              }
-            },
+            onTap: isHost
+                ? () => onHostRestart(together)
+                // Non-host: wait for the host. The room-status listener moves us
+                // the moment the host flips the room out of `complete`.
+                : null,
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 17),
               decoration: BoxDecoration(
-                color: t.pop,
+                color: isHost ? t.pop : t.surface,
                 borderRadius: BorderRadius.circular(16),
+                border: isHost ? null : Border.all(color: t.border),
               ),
               child: Text(
-                'Pop another? →',
+                isHost ? 'Pop another? →' : 'Waiting for host…',
                 style: TextStyle(
                   fontFamily: AppFonts.ui,
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: t.ink,
+                  color: isHost ? t.ink : t.ink3,
                 ),
                 textAlign: TextAlign.center,
               ),
