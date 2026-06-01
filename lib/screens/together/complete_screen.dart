@@ -457,6 +457,41 @@ class _CTAButtons extends StatelessWidget {
             ),
           ),
         ),
+        // Guest escape: a non-host can be stranded under "Waiting for host…" if
+        // the host already left. Give them a clear way out that mirrors the
+        // Leave control in co_focus_screen (leaveRoom → pop to the entry screen).
+        if (!isHost) ...[
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: GestureDetector(
+              onTap: () async {
+                await together.leaveRoom();
+                if (context.mounted) {
+                  Navigator.of(context).popUntil((r) => r.isFirst);
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 17),
+                decoration: BoxDecoration(
+                  color: t.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: t.border),
+                ),
+                child: Text(
+                  'Leave room',
+                  style: TextStyle(
+                    fontFamily: AppFonts.ui,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: t.ink2,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 10),
         // "End session"
         SizedBox(

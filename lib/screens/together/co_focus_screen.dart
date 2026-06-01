@@ -780,17 +780,32 @@ class _ReactionTray extends StatefulWidget {
 
 class _ReactionTrayState extends State<_ReactionTray> {
   static const _emojis = ['🔥', '💪', '⚡', '🎉', '❤️'];
-  String? _sent;
+
+  // The emoji currently showing its tap pulse. Cleared after a short flash so
+  // the highlight is purely cosmetic — it never gates the rest of the tray.
+  String? _flash;
+  // Very short per-tap debounce to swallow accidental double-fires only. The
+  // tray as a whole stays live, so reactions can be sent back-to-back.
+  DateTime? _lastTap;
 
   Future<void> _send(String emoji) async {
-    setState(() => _sent = emoji);
+    final now = DateTime.now();
+    if (_lastTap != null &&
+        now.difference(_lastTap!) < const Duration(milliseconds: 300)) {
+      return;
+    }
+    _lastTap = now;
+
+    setState(() => _flash = emoji);
     for (final p in widget.together.participants) {
       if (p.userId != widget.together.myUserId) {
         await widget.together.sendReaction(emoji, p.userId);
       }
     }
-    await Future<void>.delayed(const Duration(milliseconds: 1500));
-    if (mounted) setState(() => _sent = null);
+    // Clear the per-tap pulse shortly after; this does not lock the tray.
+    Future<void>.delayed(const Duration(milliseconds: 280), () {
+      if (mounted && _flash == emoji) setState(() => _flash = null);
+    });
   }
 
   @override
@@ -829,9 +844,9 @@ class _ReactionTrayState extends State<_ReactionTray> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: _emojis.map((e) {
-              final active = _sent == e;
+              final active = _flash == e;
               return GestureDetector(
-                onTap: _sent == null ? () => _send(e) : null,
+                onTap: () => _send(e),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 120),
                   margin: const EdgeInsets.symmetric(horizontal: 4),
