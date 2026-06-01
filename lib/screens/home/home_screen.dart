@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_typography.dart';
 
@@ -32,8 +33,29 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: t.bg,
       body: SafeArea(
-        child: Consumer<TimerController>(
-          builder: (context, timer, _) => _HomeContent(timer: timer, t: t),
+        // Desktop shortcut: Space toggles pause/resume. We read the timer fresh
+        // in the callback (not the Consumer's instance) so the binding stays
+        // valid regardless of rebuilds. Space only acts on a live (running or
+        // paused) timer — it never auto-starts an idle one. The autofocusing
+        // Focus wraps only the home body (no text fields live here; task entry
+        // is a separate route), so it won't swallow keystrokes in text input.
+        child: CallbackShortcuts(
+          bindings: <ShortcutActivator, VoidCallback>{
+            const SingleActivator(LogicalKeyboardKey.space): () {
+              final timer = context.read<TimerController>();
+              if (timer.status == TimerStatus.running) {
+                timer.pause();
+              } else if (timer.status == TimerStatus.paused) {
+                timer.start();
+              }
+            },
+          },
+          child: Focus(
+            autofocus: true,
+            child: Consumer<TimerController>(
+              builder: (context, timer, _) => _HomeContent(timer: timer, t: t),
+            ),
+          ),
         ),
       ),
     );
