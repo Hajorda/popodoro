@@ -138,6 +138,7 @@ class MiniTimerPill extends StatelessWidget {
     // Solo timer pill.
     final timer = context.watch<TimerController>();
     final isRunning = timer.status == TimerStatus.running;
+    final isPaused = timer.status == TimerStatus.paused;
 
     return GestureDetector(
       onPanStart: (_) => _startDragging(),
@@ -159,7 +160,7 @@ class MiniTimerPill extends StatelessWidget {
                   fontFamily: AppFonts.mono,
                   fontSize: 26,
                   fontWeight: FontWeight.w700,
-                  color: t.ink,
+                  color: isPaused ? t.ink3 : t.ink,
                   letterSpacing: -1,
                   height: 1.0,
                 ),
@@ -167,12 +168,13 @@ class MiniTimerPill extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  timer.phase.labelUpper,
+                  isPaused ? 'PAUSED' : timer.phase.labelUpper,
                   style: TextStyle(
                     fontFamily: AppFonts.mono,
                     fontSize: 9,
-                    letterSpacing: 0.12,
-                    color: t.ink3,
+                    letterSpacing: isPaused ? 0.24 : 0.12,
+                    fontWeight: isPaused ? FontWeight.w700 : FontWeight.w400,
+                    color: isPaused ? t.ink2 : t.ink3,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),

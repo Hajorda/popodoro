@@ -298,37 +298,62 @@ class _TimerCenter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appearance = context.read<SettingsController>().timerAppearance;
+    final isPaused = timer.status == TimerStatus.paused;
     return LayoutBuilder(builder: (context, c) {
       final size = (c.maxWidth * 0.78).clamp(200.0, 320.0);
       return Center(
         child: GestureDetector(
+          onTap: () {
+            final snd = context.read<SoundService>();
+            switch (timer.status) {
+              case TimerStatus.running:
+                snd.playSwitch();
+                timer.pause();
+              case TimerStatus.paused:
+                snd.playSwitch();
+                timer.start();
+              case TimerStatus.idle:
+              case TimerStatus.complete:
+                if (timer.phase == TimerPhase.focus) {
+                  // Task sheet plays its own switch sound on confirm.
+                  showTaskInputSheet(context);
+                } else {
+                  snd.playSwitch();
+                  timer.start();
+                }
+            }
+          },
           onLongPress: () => Navigator.of(context).push(
             MaterialPageRoute<void>(builder: (_) => const TimerSettingsScreen()),
           ),
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 280),
-            switchInCurve: Curves.easeOut,
-            switchOutCurve: Curves.easeIn,
-            transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
-            child: KeyedSubtree(
-              key: ValueKey(appearance),
-              child: TimerDisplay(
-                appearance: appearance,
-                progress: timer.progress,
-                timeDisplay: timer.timeDisplay,
-                sessionLabel: timer.sessionDisplay,
-                taskName: timer.taskName.isNotEmpty ? timer.taskName : null,
-                ringColor: _accentColor,
-                trackColor: t.surface2,
-                inkColor: t.ink,
-                ink2Color: t.ink2,
-                ink3Color: t.ink3,
-                surfaceColor: t.surface,
-                borderColor: t.border,
-                bumpColor: t.bump,
-                bumpEdgeColor: t.bumpEdge,
-                size: size,
-                strokeWidth: size * 0.045,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 200),
+            opacity: isPaused ? 0.5 : 1.0,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 280),
+              switchInCurve: Curves.easeOut,
+              switchOutCurve: Curves.easeIn,
+              transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
+              child: KeyedSubtree(
+                key: ValueKey(appearance),
+                child: TimerDisplay(
+                  appearance: appearance,
+                  progress: timer.progress,
+                  timeDisplay: timer.timeDisplay,
+                  sessionLabel: timer.sessionDisplay,
+                  taskName: timer.taskName.isNotEmpty ? timer.taskName : null,
+                  ringColor: _accentColor,
+                  trackColor: t.surface2,
+                  inkColor: t.ink,
+                  ink2Color: t.ink2,
+                  ink3Color: t.ink3,
+                  surfaceColor: t.surface,
+                  borderColor: t.border,
+                  bumpColor: t.bump,
+                  bumpEdgeColor: t.bumpEdge,
+                  size: size,
+                  strokeWidth: size * 0.045,
+                ),
               ),
             ),
           ),
@@ -348,11 +373,18 @@ class _SessionInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isPaused = timer.status == TimerStatus.paused;
     return Column(
       children: [
         Text(
-          timer.sessionDisplay,
-          style: TextStyle(fontFamily: AppFonts.mono, fontSize: 10, color: t.ink3, letterSpacing: 0.14),
+          isPaused ? 'PAUSED' : timer.sessionDisplay,
+          style: TextStyle(
+            fontFamily: AppFonts.mono,
+            fontSize: 10,
+            color: isPaused ? t.ink2 : t.ink3,
+            letterSpacing: isPaused ? 0.24 : 0.14,
+            fontWeight: isPaused ? FontWeight.w700 : FontWeight.w400,
+          ),
           textAlign: TextAlign.center,
         ),
         if (timer.taskName.isNotEmpty)
@@ -479,7 +511,7 @@ class _ActionRow extends StatelessWidget {
             borderColor: t.border,
             ink2Color: t.ink2,
           ),
-          if (isRunning && timer.phase == TimerPhase.focus) ...[
+          if ((isRunning || isPaused) && timer.phase == TimerPhase.focus) ...[
             const SizedBox(width: 10),
             PopButton(
               label: '+ 5',
