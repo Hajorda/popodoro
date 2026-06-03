@@ -64,16 +64,6 @@ jobs:
           MACOS_PRIVATE_KEY: ${{ secrets.MAC_PRIVATE_KEY }}
         run: |
           echo "$MACOS_PRIVATE_KEY" | macos/Pods/Sparkle/bin/sign_update -f - -p popodoro-macos.dmg > mac_sig.txt
-      - name: Sign Windows Installer for Auto Updater
-        env:
-          WINDOWS_PRIVATE_KEY: ${{ secrets.WINDOWS_PRIVATE_KEY }}
-        shell: bash
-        run: |
-          INSTALLER=$(find build/windows/x64/installer -name "*.exe" | head -n 1)
-          echo "$WINDOWS_PRIVATE_KEY" > dsa_priv.pem
-          # WinSparkle requires sha1 dsa signature
-          openssl dgst -sha1 -binary < "$INSTALLER" | openssl dgst -sha1 -sign "dsa_priv.pem" | openssl enc -base64 > win_sig.txt
-          rm dsa_priv.pem
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
