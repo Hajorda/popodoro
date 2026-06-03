@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
+
 
 import '../../controllers/history_controller.dart';
 import '../../controllers/settings_controller.dart';
@@ -520,7 +520,7 @@ class _NavRow extends StatelessWidget {
 
 // ── About section ─────────────────────────────────────────────────────────────
 
-enum _UpdateState { idle, checking, upToDate, available, error }
+
 
 class _AboutSection extends StatefulWidget {
   const _AboutSection({required this.t});
@@ -547,6 +547,7 @@ class _AboutSectionState extends State<_AboutSection> {
   Future<void> _checkForUpdate() async {
     await UpdateService.checkForUpdate();
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -641,15 +642,58 @@ class _AboutSectionState extends State<_AboutSection> {
                           color: t.ink,
                         ),
                       ),
-
-
-,
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
-,
+// ── Action row ────────────────────────────────────────────────────────────────
+
+class _ActionRow extends StatelessWidget {
+  const _ActionRow({
+    required this.t,
+    required this.icon,
+    required this.label,
+    this.subtitle,
+    this.isLast = false,
+    required this.onTap,
+  });
+  final AppTokens t;
+  final IconData icon;
+  final String label;
+  final String? subtitle;
+  final bool isLast;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontFamily: AppFonts.ui,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: t.ink,
+                    ),
+                  ),
                   if (subtitle != null)
                     Text(
                       subtitle!,
