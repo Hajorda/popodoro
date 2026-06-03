@@ -35,6 +35,7 @@ class _PopodoroShellState extends State<PopodoroShell> {
   TimerStatus? _prevTimerStatus;
   bool _prevAwaitingCycleAck = false;
   bool _prevRoomComplete = false;
+  TimerPhase? _prevPhase;
 
   @override
   void didChangeDependencies() {
@@ -50,6 +51,7 @@ class _PopodoroShellState extends State<PopodoroShell> {
       _timer!.addListener(_onTimerChanged);
       _prevTimerStatus = timer.status;
       _prevAwaitingCycleAck = timer.awaitingCycleAck;
+      _prevPhase = timer.phase;
     }
 
     if (!identical(together, _together)) {
@@ -70,6 +72,7 @@ class _PopodoroShellState extends State<PopodoroShell> {
 
     final status = timer.status;
     final awaiting = timer.awaitingCycleAck;
+    final phase = timer.phase;
 
     final stoppedRunning = _prevTimerStatus == TimerStatus.running &&
         (status == TimerStatus.idle || status == TimerStatus.complete);
@@ -79,8 +82,14 @@ class _PopodoroShellState extends State<PopodoroShell> {
       _exitMiniModeIfActive();
     }
 
+    // Apply per-phase window opacity when the phase changes in mini mode.
+    if (phase != _prevPhase) {
+      _windowService?.applyPhaseOpacity(phase);
+    }
+
     _prevTimerStatus = status;
     _prevAwaitingCycleAck = awaiting;
+    _prevPhase = phase;
   }
 
   // Together co-focus room reached `complete`: the shared session is over, so

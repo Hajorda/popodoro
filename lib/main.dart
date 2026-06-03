@@ -171,19 +171,21 @@ class _PopodoroAppState extends State<PopodoroApp> {
             return previous!;
           },
         ),
-        ProxyProvider3<
+        ProxyProvider4<
           SettingsController,
           TimerController,
           TogetherService,
+          WindowService,
           DesktopTrayService
         >(
           lazy: false,
           create: (_) => DesktopTrayService(),
-          update: (_, settings, timer, together, previous) =>
+          update: (_, settings, timer, together, windowService, previous) =>
               (previous ?? DesktopTrayService()).bind(
                 settings: settings,
                 timer: timer,
                 together: together,
+                windowService: windowService,
               ),
           dispose: (_, service) => service.dispose(),
         ),

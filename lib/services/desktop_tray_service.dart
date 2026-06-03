@@ -8,11 +8,13 @@ import 'package:window_manager/window_manager.dart';
 import '../controllers/settings_controller.dart';
 import '../controllers/timer_controller.dart';
 import 'together_service.dart';
+import 'window_service.dart';
 
 class DesktopTrayService with WindowListener, TrayListener {
   SettingsController? _settings;
   TimerController? _timer;
   TogetherService? _together;
+  WindowService? _windowService;
   Menu? _menu;
 
   bool _windowListenerAttached = false;
@@ -28,6 +30,7 @@ class DesktopTrayService with WindowListener, TrayListener {
     required SettingsController settings,
     required TimerController timer,
     required TogetherService together,
+    WindowService? windowService,
   }) {
     if (!_supportedPlatform) return this;
 
@@ -49,6 +52,8 @@ class DesktopTrayService with WindowListener, TrayListener {
       together.addListener(_onTogetherChanged);
     }
 
+    _windowService = windowService;
+
     _scheduleTrayUpdate();
     return this;
   }
@@ -66,6 +71,7 @@ class DesktopTrayService with WindowListener, TrayListener {
       items: [
         MenuItem(key: 'show_window', label: 'Show Popodoro'),
         MenuItem(key: 'hide_window', label: 'Hide window'),
+        MenuItem(key: 'mini_mode', label: 'Mini mode'),
         MenuItem.separator(),
         MenuItem(key: 'quit_app', label: 'Quit Popodoro'),
       ],
@@ -221,10 +227,18 @@ class DesktopTrayService with WindowListener, TrayListener {
       case 'hide_window':
         unawaited(_hideWindow());
         break;
+      case 'mini_mode':
+        unawaited(_enterMiniMode());
+        break;
       case 'quit_app':
         unawaited(_quitFromTray());
         break;
     }
+  }
+
+  Future<void> _enterMiniMode() async {
+    await _showWindow();
+    await _windowService?.enterMiniMode();
   }
 
   Future<String> _resolveIconAssetPath() async {

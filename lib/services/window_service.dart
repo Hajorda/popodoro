@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../models/pomodoro_state.dart';
+
 class WindowService extends ChangeNotifier {
   WindowService({required SharedPreferences prefs}) : _prefs = prefs;
 
@@ -21,6 +23,12 @@ class WindowService extends ChangeNotifier {
 
   static const _kMiniX = 'miniWindowX';
   static const _kMiniY = 'miniWindowY';
+
+  // ── Opacity constants ───────────────────────────────────────────────────────
+  // During break phases the pill dims slightly so it's less visually heavy.
+  // Supported on macOS; on Windows setOpacity is a no-op.
+  static const double _kFocusOpacity = 1.0;
+  static const double _kBreakOpacity = 0.75;
 
   Future<void> enterMiniMode() async {
     if (!isDesktop) return;
@@ -42,6 +50,8 @@ class WindowService extends ChangeNotifier {
     // re-run window-manager calls or overwrite the saved mini position.
     if (!_isMiniMode) return;
     await _saveCurrentPosition();
+    // Restore full opacity before expanding.
+    await _setOpacity(_kFocusOpacity);
     await windowManager.setAlwaysOnTop(false);
     await windowManager.setSkipTaskbar(false);
     await windowManager.setMinimumSize(const Size(300, 500));
@@ -51,6 +61,23 @@ class WindowService extends ChangeNotifier {
     await windowManager.center();
     _isMiniMode = false;
     notifyListeners();
+  }
+
+  // Called by the pill whenever the timer phase changes while in mini mode.
+  // Dims the window during break phases so the pill is less visually heavy.
+  Future<void> applyPhaseOpacity(TimerPhase phase) async {
+    if (!isDesktop || !_isMiniMode) return;
+    final opacity = (phase == TimerPhase.focus) ? _kFocusOpacity : _kBreakOpacity;
+    await _setOpacity(opacity);
+  }
+
+  Future<void> _setOpacity(double opacity) async {
+    try {
+      await windowManager.setOpacity(opacity);
+    } catch (_) {
+      // setOpacity may throw on platforms where it's unsupported (e.g. some
+      // Linux configurations). Swallow silently — opacity is purely cosmetic.
+    }
   }
 
   Future<void> _saveCurrentPosition() async {
