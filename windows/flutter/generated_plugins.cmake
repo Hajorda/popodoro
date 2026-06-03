@@ -5,6 +5,7 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   app_links
   audioplayers_windows
+  auto_updater_windows
   file_selector_windows
   permission_handler_windows
   screen_retriever_windows

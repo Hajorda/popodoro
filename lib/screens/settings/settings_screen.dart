@@ -532,8 +532,6 @@ class _AboutSection extends StatefulWidget {
 
 class _AboutSectionState extends State<_AboutSection> {
   String _version = '—';
-  _UpdateState _updateState = _UpdateState.idle;
-  UpdateInfo? _updateInfo;
 
   @override
   void initState() {
@@ -547,26 +545,7 @@ class _AboutSectionState extends State<_AboutSection> {
   }
 
   Future<void> _checkForUpdate() async {
-    if (_updateState == _UpdateState.checking) return;
-    setState(() => _updateState = _UpdateState.checking);
-    try {
-      final info = await UpdateService.checkForUpdate();
-      if (!mounted) return;
-      setState(() {
-        _updateInfo = info;
-        _updateState =
-            info != null ? _UpdateState.available : _UpdateState.upToDate;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _updateState = _UpdateState.error);
-    }
-  }
-
-  Future<void> _openDownload() async {
-    final url = _updateInfo?.downloadUrl;
-    if (url == null) return;
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) await launchUrl(uri);
+    await UpdateService.checkForUpdate();
   }
 
   @override
@@ -627,9 +606,7 @@ class _AboutSectionState extends State<_AboutSection> {
 
         // Check for updates row
         GestureDetector(
-          onTap: _updateState == _UpdateState.available
-              ? _openDownload
-              : _checkForUpdate,
+          onTap: _checkForUpdate,
           behavior: HitTestBehavior.opaque,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
@@ -656,115 +633,23 @@ class _AboutSectionState extends State<_AboutSection> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _updateState == _UpdateState.available
-                            ? 'Update available'
-                            : 'Check for updates',
+                        'Check for updates',
                         style: TextStyle(
                           fontFamily: AppFonts.ui,
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
-                          color: _updateState == _UpdateState.available
-                              ? t.sage
-                              : t.ink,
+                          color: t.ink,
                         ),
                       ),
-                      if (_updateState == _UpdateState.available &&
-                          _updateInfo != null)
-                        Text(
-                          'v${_updateInfo!.version} ready to download',
-                          style: TextStyle(
-                            fontFamily: AppFonts.ui,
-                            fontSize: 12,
-                            color: t.sage,
-                            height: 1.4,
-                          ),
-                        )
-                      else if (_updateState == _UpdateState.upToDate)
-                        Text(
-                          "You're on the latest version",
-                          style: TextStyle(
-                            fontFamily: AppFonts.ui,
-                            fontSize: 12,
-                            color: t.ink3,
-                            height: 1.4,
-                          ),
-                        )
-                      else if (_updateState == _UpdateState.error)
-                        Text(
-                          'Check failed — try again',
-                          style: TextStyle(
-                            fontFamily: AppFonts.ui,
-                            fontSize: 12,
-                            color: t.ember,
-                            height: 1.4,
-                          ),
-                        ),
+
+
+,
                     ],
                   ),
                 ),
                 const SizedBox(width: 8),
-                if (_updateState == _UpdateState.checking)
-                  SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 1.5,
-                      color: t.ink3,
-                    ),
-                  )
-                else if (_updateState == _UpdateState.available)
-                  Icon(Icons.download_rounded, size: 18, color: t.sage)
-                else
-                  Icon(Icons.chevron_right_rounded, size: 18, color: t.ink3),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
 
-// ── Action row ────────────────────────────────────────────────────────────────
-
-class _ActionRow extends StatelessWidget {
-  const _ActionRow({
-    required this.t,
-    required this.icon,
-    required this.label,
-    this.subtitle,
-    this.isLast = false,
-    required this.onTap,
-  });
-  final AppTokens t;
-  final IconData icon;
-  final String label;
-  final String? subtitle;
-  final bool isLast;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontFamily: AppFonts.ui,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: t.ink,
-                    ),
-                  ),
+,
                   if (subtitle != null)
                     Text(
                       subtitle!,

@@ -24,7 +24,7 @@ import 'services/sync_service.dart';
 import 'services/together_service.dart';
 import 'services/update_service.dart';
 import 'services/window_service.dart';
-import 'widgets/update_dialog.dart';
+
 
 const _supabaseUrl = 'https://ysbbdxvwittczfrezzlm.supabase.co';
 const _supabaseAnonKey =
@@ -88,13 +88,7 @@ class _PopodoroAppState extends State<PopodoroApp> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final updateInfo = await UpdateService.checkForUpdate();
-      if (updateInfo != null && _navigatorKey.currentContext != null) {
-        showDialog(
-          context: _navigatorKey.currentContext!,
-          builder: (context) => UpdateDialog(updateInfo: updateInfo),
-        );
-      }
+      await UpdateService.checkForUpdate();
     });
   }
 

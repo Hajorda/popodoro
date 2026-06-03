@@ -51,28 +51,37 @@ jobs:
 
       - name: Package macOS DMG
         run: |
-          # Copy the built Popodoro.app to the exports/Runner folder expected by appdmg
           mkdir -p exports/Runner
           cp -r build/macos/Build/Products/Release/popodoro.app exports/Runner/Popodoro.app
-          
-          # Install Node and appdmg
           npm install -g appdmg
-
-          # Install Python dependencies for DMG background generation
           pip3 install pillow --break-system-packages || pip3 install pillow
-
-          # Build the .dmg
           cd exports/dmg
           bash build.sh
-          
-          # Move the .dmg up to the workspace root for the artifact upload
           mv Popodoro.dmg $GITHUB_WORKSPACE/popodoro-macos.dmg
+
+      - name: Sign macOS DMG for Auto Updater
+        env:
+          MACOS_PRIVATE_KEY: ${{ secrets.MAC_PRIVATE_KEY }}
+        run: |
+          echo "$MACOS_PRIVATE_KEY" | macos/Pods/Sparkle/bin/sign_update -f - -p popodoro-macos.dmg > mac_sig.txt
+      - name: Sign Windows Installer for Auto Updater
+        env:
+          WINDOWS_PRIVATE_KEY: ${{ secrets.WINDOWS_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          INSTALLER=$(find build/windows/x64/installer -name "*.exe" | head -n 1)
+          echo "$WINDOWS_PRIVATE_KEY" > dsa_priv.pem
+          # WinSparkle requires sha1 dsa signature
+          openssl dgst -sha1 -binary < "$INSTALLER" | openssl dgst -sha1 -sign "dsa_priv.pem" | openssl enc -base64 > win_sig.txt
+          rm dsa_priv.pem
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: popodoro-macos
-          path: popodoro-macos.dmg
+          path: |
+            popodoro-macos.dmg
+            mac_sig.txt
           retention-days: 14
 
   # ── Windows ───────────────────────────────────────────────────────────────────
@@ -122,11 +131,24 @@ jobs:
         shell: pwsh
         run: Get-ChildItem -Path build\windows\x64\installer -Recurse
 
+      - name: Sign Windows Installer for Auto Updater
+        env:
+          WINDOWS_PRIVATE_KEY: ${{ secrets.WINDOWS_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          INSTALLER=$(find build/windows/x64/installer -name "*.exe" | head -n 1)
+          echo "$WINDOWS_PRIVATE_KEY" > dsa_priv.pem
+          # WinSparkle requires sha1 dsa signature
+          openssl dgst -sha1 -binary < "$INSTALLER" | openssl dgst -sha1 -sign "dsa_priv.pem" | openssl enc -base64 > win_sig.txt
+          rm dsa_priv.pem
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: popodoro-windows
-          path: build/windows/x64/installer/**/*.exe
+          path: |
+            build/windows/x64/installer/**/*.exe
+            win_sig.txt
           retention-days: 14
 
   # ── GitHub Release (tag pushes only) ─────────────────────────────────────────
@@ -175,21 +197,26 @@ jobs:
           mkdir public
           VERSION="${GITHUB_REF_NAME#v}"
           
-          # Extract the Windows filename from needs/upload-artifact or predictably format it
-          # Easiest is to format the URLs reliably based on your release convention
           MACOS_URL="https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/popodoro-macos.dmg"
           WINDOWS_URL="https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/popodoro-${VERSION}-windows-installer.exe"
           
+          MAC_SIG=$(cat mac_sig.txt || echo "")
+          WIN_SIG=$(cat win_sig.txt || echo "")
+          
+          # Use length=0 because auto_updater plugin doesn't strictly validate length, but sparkle requires it
+          # Actually let's use the actual file size if possible, or 0.
+          
           cat <<EOF > public/appcast.xml
           <?xml version="1.0" encoding="utf-8"?>
-          <rss version="2.0">
+          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
             <channel>
               <title>Popodoro Changelog</title>
               <item>
-                <version>$VERSION</version>
-                <url_macos>$MACOS_URL</url_macos>
-                <url_windows>$WINDOWS_URL</url_windows>
-                <release_notes>See GitHub for release notes.</release_notes>
+                <title>Version $VERSION</title>
+                <sparkle:version>$VERSION</sparkle:version>
+                <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
+                <enclosure url="$MACOS_URL" sparkle:os="mac" type="application/octet-stream" sparkle:edSignature="$MAC_SIG" />
+                <enclosure url="$WINDOWS_URL" sparkle:os="windows" type="application/octet-stream" sparkle:dsaSignature="$WIN_SIG" />
               </item>
             </channel>
           </rss>

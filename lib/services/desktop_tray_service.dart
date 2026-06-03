@@ -142,6 +142,9 @@ class DesktopTrayService with WindowListener, TrayListener {
   }
 
   Future<void> _showWindow() async {
+    if (await windowManager.isMinimized()) {
+      await windowManager.restore();
+    }
     await windowManager.show();
     await windowManager.focus();
   }
@@ -151,8 +154,11 @@ class DesktopTrayService with WindowListener, TrayListener {
   }
 
   Future<void> _toggleWindow() async {
-    final visible = await windowManager.isVisible();
-    if (visible) {
+    final isVisible = await windowManager.isVisible();
+    final isFocused = await windowManager.isFocused();
+    final isMinimized = await windowManager.isMinimized();
+
+    if (isVisible && isFocused && !isMinimized) {
       await _hideWindow();
     } else {
       await _showWindow();
