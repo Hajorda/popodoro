@@ -91,7 +91,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
                       PulsingDot(color: t.ember, size: 8),
                       const SizedBox(width: 8),
                       Text(
-                        'LOBBY · ${room.durationMinutes} MIN FOCUS',
+                        room.roundsTotal > 1
+                            ? 'LOBBY · ${room.roundsTotal} ROUNDS'
+                            : 'LOBBY · ${room.durationMinutes} MIN FOCUS',
                         style: TextStyle(
                           fontFamily: AppFonts.mono,
                           fontSize: 10,

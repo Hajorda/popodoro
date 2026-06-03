@@ -15,6 +15,8 @@ class TogetherRoom {
     this.breakMinutes = 5,
     this.breakStartedAt,
     this.elapsedSeconds = 0,
+    this.roundsTotal = 1,
+    this.currentRound = 1,
   });
 
   final String id;
@@ -27,6 +29,8 @@ class TogetherRoom {
   final int breakMinutes;
   final DateTime? breakStartedAt;
   final int elapsedSeconds;
+  final int roundsTotal;
+  final int currentRound;
 
   bool get isLobby => status == 'lobby';
   bool get isFocusing => status == 'active';
@@ -49,6 +53,8 @@ class TogetherRoom {
             ? DateTime.parse(m['break_started_at'] as String).toLocal()
             : null,
         elapsedSeconds: (m['elapsed_seconds'] as int?) ?? 0,
+        roundsTotal: (m['rounds_total'] as int?) ?? 1,
+        currentRound: (m['current_round'] as int?) ?? 1,
       );
 
   TogetherRoom copyWith({String? status, DateTime? startedAt, DateTime? breakStartedAt, int? elapsedSeconds}) =>
@@ -63,6 +69,8 @@ class TogetherRoom {
         breakMinutes: breakMinutes,
         breakStartedAt: breakStartedAt ?? this.breakStartedAt,
         elapsedSeconds: elapsedSeconds ?? this.elapsedSeconds,
+        roundsTotal: roundsTotal,
+        currentRound: currentRound,
       );
 
   Duration get remaining {
@@ -230,6 +238,7 @@ class TogetherService extends ChangeNotifier {
     String? taskName,
     int durationMinutes = 25,
     int breakMinutes = 5,
+    int roundsTotal = 1,
   }) =>
       _run(() async {
         final userId = _client.auth.currentUser!.id;
@@ -241,6 +250,8 @@ class TogetherService extends ChangeNotifier {
           if (taskName != null && taskName.isNotEmpty) 'task_name': taskName,
           'duration_minutes': durationMinutes,
           'break_minutes': breakMinutes,
+          'rounds_total': roundsTotal,
+          'current_round': 1,
           'status': 'lobby',
         }).select().single();
 
@@ -317,6 +328,21 @@ class TogetherService extends ChangeNotifier {
         .eq('id', _room!.id);
   }
 
+  /// Host → transitions from break to the next focus round.
+  Future<void> nextRound() async {
+    if (_room == null || !isHost) return;
+    if (_room!.currentRound >= _room!.roundsTotal) return;
+    final now = DateTime.now().toUtc().toIso8601String();
+    await _client.from('rooms').update({
+      'status': 'active',
+      'started_at': now,
+      'break_started_at': null,
+      'elapsed_seconds': 0,
+      'current_round': _room!.currentRound + 1,
+    }).eq('id', _room!.id);
+    _updateTicker();
+  }
+
   /// Host → pauses the focus timer.
   Future<void> pauseSession() async {
     if (_room == null || !isHost || !_room!.isFocusing) return;
@@ -352,6 +378,7 @@ class TogetherService extends ChangeNotifier {
       'started_at': null,
       'break_started_at': null,
       'elapsed_seconds': 0,
+      'current_round': 1,
     }).eq('id', _room!.id);
     await _client
         .from('room_participants')

@@ -51,6 +51,18 @@ const List<BgTrack> kBgTracks = [
     emoji: '⚔️',
     url: 'https://bucket.ablt.dev/Berserk-Guts-Meditation-Music.mp3',
   ),
+  BgTrack(
+    id: 'brown_noise',
+    label: 'Brown noise',
+    emoji: '🤎',
+    url: 'https://bucket.ablt.dev/Brown%20Noise.mp3',
+  ),
+  BgTrack(
+    id: 'ibadet',
+    label: 'Ibadeti sağladıysan',
+    emoji: '🕌',
+    url: 'https://bucket.ablt.dev/ibadet.mp3',
+  ),
 ];
 
 // ── Service ────────────────────────────────────────────────────────────────────

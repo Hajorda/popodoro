@@ -54,12 +54,16 @@ class _CoFocusScreenState extends State<CoFocusScreen> {
 
     if (room.isFocusing && room.remaining == Duration.zero && !_breakTriggered) {
       _breakTriggered = true;
-      together.startBreak();
+      if (room.currentRound >= room.roundsTotal) {
+        together.endSession();
+      } else {
+        together.startBreak();
+      }
     }
 
-    if (room.isOnBreak && room.breakRemaining == Duration.zero && !_completeTriggered) {
-      _completeTriggered = true;
-      together.endSession();
+    if (room.isOnBreak && room.breakRemaining == Duration.zero) {
+      _breakTriggered = false; // reset for the next focus round
+      together.nextRound();
     }
   }
 
@@ -175,8 +179,9 @@ class _FocusBody extends StatelessWidget {
                   appearance: settings.timerAppearance,
                   progress: room.progress,
                   timeDisplay: room.timeDisplay,
-                  sessionLabel:
-                      'TOGETHER · ${together.participants.length}',
+                  sessionLabel: room.roundsTotal > 1
+                      ? 'ROUND ${room.currentRound}/${room.roundsTotal} · ${together.participants.length} POPS'
+                      : 'TOGETHER · ${together.participants.length}',
                   taskName: null,
                   ringColor: t.pop,
                   trackColor: t.surface2,
@@ -393,7 +398,7 @@ class _BreakBody extends StatelessWidget {
                     _GhostBtn(
                       t: t,
                       label: 'Skip break →',
-                      onTap: () => together.endSession(),
+                      onTap: () => together.nextRound(),
                     ),
                     const SizedBox(width: 16),
                   ],
@@ -758,9 +763,11 @@ class _ActionRow extends StatelessWidget {
           Expanded(
             child: _PrimaryBtn(
               t: t,
-              label: isHost ? 'End focus →' : 'Leave',
+              label: isHost
+                  ? (room.currentRound >= room.roundsTotal ? 'End session →' : 'End focus →')
+                  : 'Leave',
               onTap: isHost
-                  ? () => together.startBreak()
+                  ? () => room.currentRound >= room.roundsTotal ? together.endSession() : together.startBreak()
                   : () async {
                       await together.leaveRoom();
                       if (context.mounted) {
